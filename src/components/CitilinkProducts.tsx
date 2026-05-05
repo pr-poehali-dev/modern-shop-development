@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 
 const products = [
@@ -85,6 +86,7 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 export default function CitilinkProducts() {
+  const navigate = useNavigate();
   return (
     <div className="max-w-[1200px] mx-auto px-4 py-4">
       <div className="flex items-center justify-between mb-3">
@@ -98,6 +100,7 @@ export default function CitilinkProducts() {
         {products.map((p) => (
           <div
             key={p.id}
+            onClick={() => navigate(`/product/${p.id}`)}
             className="bg-white rounded-2xl border border-[#e0e0e0] hover:border-[#e31e24] hover:shadow-md transition-all cursor-pointer group flex flex-col overflow-hidden"
           >
             {/* Image */}
