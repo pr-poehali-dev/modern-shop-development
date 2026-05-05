@@ -24,7 +24,7 @@ export default function CitilinkCategories() {
           <a
             key={cat.name}
             href="#"
-            className="bg-white rounded p-3 flex flex-col items-center gap-2 hover:shadow-md transition-shadow group border border-transparent hover:border-[#e31e24]"
+            className="bg-white rounded-2xl p-3 flex flex-col items-center gap-2 hover:shadow-md transition-shadow group border border-transparent hover:border-[#e31e24]"
           >
             <div
               className="w-12 h-12 rounded-full flex items-center justify-center"

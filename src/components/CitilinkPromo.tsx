@@ -29,7 +29,7 @@ export default function CitilinkPromo() {
         {promoBanners.map((b, i) => (
           <div
             key={i}
-            className="rounded p-6 flex flex-col justify-between h-[140px] cursor-pointer hover:opacity-95 transition-opacity"
+            className="rounded-2xl p-6 flex flex-col justify-between h-[140px] cursor-pointer hover:opacity-95 transition-opacity"
             style={{ background: b.bg, color: b.text }}
           >
             <div>

@@ -98,7 +98,7 @@ export default function CitilinkProducts() {
         {products.map((p) => (
           <div
             key={p.id}
-            className="bg-white rounded border border-[#e0e0e0] hover:border-[#e31e24] hover:shadow-md transition-all cursor-pointer group flex flex-col"
+            className="bg-white rounded-2xl border border-[#e0e0e0] hover:border-[#e31e24] hover:shadow-md transition-all cursor-pointer group flex flex-col overflow-hidden"
           >
             {/* Image */}
             <div className="relative">
