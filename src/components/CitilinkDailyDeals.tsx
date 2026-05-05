@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 
@@ -68,41 +68,13 @@ function getEndOfDay() {
   return Math.floor((end.getTime() - now.getTime()) / 1000);
 }
 
-function StarRating({ rating }: { rating: number }) {
-  return (
-    <div className="flex items-center gap-0.5">
-      {[1, 2, 3, 4, 5].map((s) => (
-        <Icon
-          key={s}
-          name="Star"
-          size={11}
-          className={s <= Math.round(rating) ? "text-[#ffc107] fill-[#ffc107]" : "text-gray-300 fill-gray-300"}
-        />
-      ))}
-    </div>
-  );
-}
-
-function TimeBlock({ value, label }: { value: number; label: string }) {
-  return (
-    <div className="flex flex-col items-center">
-      <div className="bg-[#1a1a1a] text-white font-bold text-xl w-12 h-12 rounded-xl flex items-center justify-center tabular-nums">
-        {String(value).padStart(2, "0")}
-      </div>
-      <span className="text-[10px] text-gray-500 mt-1">{label}</span>
-    </div>
-  );
-}
-
 export default function CitilinkDailyDeals() {
   const navigate = useNavigate();
   const [offset, setOffset] = useState(0);
   const [animating, setAnimating] = useState(false);
   const [direction, setDirection] = useState<"next" | "prev">("next");
   const [seconds, setSeconds] = useState(getEndOfDay);
-  const trackRef = useRef<HTMLDivElement>(null);
 
-  // Countdown
   useEffect(() => {
     const t = setInterval(() => {
       setSeconds((s) => (s <= 0 ? getEndOfDay() : s - 1));
@@ -113,6 +85,7 @@ export default function CitilinkDailyDeals() {
   const hours = Math.floor(seconds / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
+  const fmt = (v: number) => String(v).padStart(2, "0");
 
   const maxOffset = deals.length - VISIBLE;
 
@@ -123,9 +96,9 @@ export default function CitilinkDailyDeals() {
     setDirection(dir);
     setAnimating(true);
     setTimeout(() => {
-      setOffset((o) => dir === "next" ? o + 1 : o - 1);
+      setOffset((o) => (dir === "next" ? o + 1 : o - 1));
       setAnimating(false);
-    }, 320);
+    }, 300);
   };
 
   const cardWidth = 100 / VISIBLE;
@@ -136,54 +109,35 @@ export default function CitilinkDailyDeals() {
     : -offset * cardWidth;
 
   return (
-    <div className="max-w-[1200px] mx-auto px-4 py-2">
-      <div className="bg-white rounded-2xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center gap-4 px-5 py-4 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <Icon name="Flame" size={22} className="text-[#e31e24]" />
-            <h2 className="text-xl font-bold text-gray-900">Товары дня</h2>
-          </div>
+    <div className="max-w-[1200px] mx-auto px-4 py-3">
+      <div className="bg-white rounded-2xl px-5 py-4">
 
-          {/* Timer */}
-          <div className="flex items-center gap-2 ml-1">
-            <span className="text-sm text-gray-500">Успейте купить:</span>
-            <div className="flex items-center gap-1.5">
-              <TimeBlock value={hours} label="часов" />
-              <span className="text-gray-400 font-bold text-xl mb-4">:</span>
-              <TimeBlock value={mins} label="минут" />
-              <span className="text-gray-400 font-bold text-xl mb-4">:</span>
-              <TimeBlock value={secs} label="секунд" />
-            </div>
-          </div>
-
-          {/* Nav arrows */}
-          <div className="flex items-center gap-2 ml-auto">
-            <button
-              onClick={() => slide("prev")}
-              disabled={offset === 0}
-              className="w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:border-[#e31e24] hover:text-[#e31e24] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            >
-              <Icon name="ChevronLeft" size={18} />
-            </button>
-            <button
-              onClick={() => slide("next")}
-              disabled={offset >= maxOffset}
-              className="w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:border-[#e31e24] hover:text-[#e31e24] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            >
-              <Icon name="ChevronRight" size={18} />
-            </button>
+        {/* Header row */}
+        <div className="flex items-center gap-3 mb-4">
+          <h2 className="text-xl font-bold text-[#f47d20]">Товары дня</h2>
+          {/* Timer inline */}
+          <div className="flex items-center gap-1">
+            <span className="bg-[#f47d20] text-white text-sm font-bold px-2 py-0.5 rounded-md tabular-nums">
+              {fmt(hours)}
+            </span>
+            <span className="text-[#f47d20] font-bold">:</span>
+            <span className="bg-[#f47d20] text-white text-sm font-bold px-2 py-0.5 rounded-md tabular-nums">
+              {fmt(mins)}
+            </span>
+            <span className="text-[#f47d20] font-bold">:</span>
+            <span className="bg-[#f47d20] text-white text-sm font-bold px-2 py-0.5 rounded-md tabular-nums">
+              {fmt(secs)}
+            </span>
           </div>
         </div>
 
         {/* Slider */}
-        <div className="overflow-hidden px-4 py-4">
+        <div className="relative overflow-hidden">
           <div
-            ref={trackRef}
             className="flex"
             style={{
               transform: `translateX(${translateX}%)`,
-              transition: animating ? "transform 320ms cubic-bezier(0.25,0.46,0.45,0.94)" : "none",
+              transition: animating ? "transform 300ms cubic-bezier(0.25,0.46,0.45,0.94)" : "none",
             }}
           >
             {deals.map((p) => {
@@ -194,59 +148,71 @@ export default function CitilinkDailyDeals() {
                 <div
                   key={p.id}
                   onClick={() => navigate(`/product/${p.id}`)}
-                  className="flex-shrink-0 cursor-pointer group px-2"
+                  className="flex-shrink-0 px-1.5"
                   style={{ width: `${cardWidth}%` }}
                 >
-                  <div className="border border-[#e0e0e0] rounded-2xl overflow-hidden hover:border-[#e31e24] hover:shadow-md transition-all flex flex-col h-full">
-                    {/* Image */}
-                    <div className="relative bg-[#f8f8f8]">
+                  <div className="border border-[#e8e8e8] rounded-2xl overflow-hidden hover:border-[#f47d20] hover:shadow-sm transition-all cursor-pointer group p-3 flex flex-col gap-2 h-full">
+
+                    {/* Rating row */}
+                    <div className="flex items-center gap-1.5">
+                      <Icon name="Star" size={12} className="text-[#f47d20] fill-[#f47d20]" />
+                      <span className="text-xs font-semibold text-gray-800">{p.rating}</span>
+                      <Icon name="MessageCircle" size={11} className="text-gray-400 ml-0.5" />
+                      <span className="text-xs text-gray-400">{p.reviews}</span>
+                    </div>
+
+                    {/* Image with discount badge */}
+                    <div className="relative flex items-center justify-center bg-white rounded-xl overflow-hidden" style={{ height: 120 }}>
                       <img
                         src={p.image}
                         alt={p.name}
-                        className="w-full h-40 object-cover"
+                        className="h-full w-full object-cover"
                       />
-                      <span className="absolute top-2 left-2 bg-[#e31e24] text-white text-[11px] font-bold px-2 py-0.5 rounded-lg">
-                        −{discount}%
+                      <span className="absolute bottom-2 left-2 bg-[#f47d20] text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
+                        -{discount}%
                       </span>
-                      <button
-                        onClick={(e) => e.stopPropagation()}
-                        className="absolute top-2 right-2 w-7 h-7 bg-white rounded-full shadow flex items-center justify-center text-gray-400 opacity-0 group-hover:opacity-100 hover:text-[#e31e24] transition-all"
-                      >
-                        <Icon name="Heart" size={13} />
-                      </button>
                     </div>
 
-                    {/* Info */}
-                    <div className="p-3 flex flex-col flex-1">
-                      <p className="text-xs text-gray-800 leading-tight line-clamp-2 mb-2 flex-1">
-                        {p.name}
-                      </p>
-                      <div className="flex items-center gap-1 mb-2">
-                        <StarRating rating={p.rating} />
-                        <span className="text-[10px] text-gray-400">({p.reviews})</span>
-                      </div>
-                      <div className="mb-3">
-                        <p className="text-base font-bold text-gray-900">
-                          {p.price.toLocaleString("ru")} ₽
-                        </p>
-                        <p className="text-xs text-gray-400 line-through">
-                          {p.oldPrice?.toLocaleString("ru")} ₽
-                        </p>
-                      </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); }}
-                        className="w-full bg-[#e31e24] hover:bg-[#c41920] text-white text-xs font-semibold py-2 rounded-xl transition-colors flex items-center justify-center gap-1"
-                      >
-                        <Icon name="ShoppingCart" size={13} />
-                        В корзину
-                      </button>
+                    {/* Name */}
+                    <p className="text-xs text-gray-800 leading-snug line-clamp-2 flex-1">
+                      {p.name}
+                    </p>
+
+                    {/* Price */}
+                    <div className="flex items-baseline gap-2 mt-auto">
+                      <span className="text-lg font-bold text-gray-900">
+                        {p.price.toLocaleString("ru")}
+                      </span>
+                      <span className="text-xs text-gray-400 line-through">
+                        {p.oldPrice?.toLocaleString("ru")} ₽
+                      </span>
                     </div>
+
                   </div>
                 </div>
               );
             })}
           </div>
+
+          {/* Right arrow — поверх последней карточки */}
+          {offset < maxOffset && (
+            <button
+              onClick={() => slide("next")}
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-16 bg-white border border-[#e8e8e8] rounded-l-xl shadow-md flex items-center justify-center text-gray-500 hover:text-[#f47d20] transition-colors"
+            >
+              <Icon name="ChevronRight" size={18} />
+            </button>
+          )}
+          {offset > 0 && (
+            <button
+              onClick={() => slide("prev")}
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-16 bg-white border border-[#e8e8e8] rounded-r-xl shadow-md flex items-center justify-center text-gray-500 hover:text-[#f47d20] transition-colors"
+            >
+              <Icon name="ChevronLeft" size={18} />
+            </button>
+          )}
         </div>
+
       </div>
     </div>
   );
