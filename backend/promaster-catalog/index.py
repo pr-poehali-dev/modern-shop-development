@@ -66,6 +66,18 @@ def fetch_url(url, headers):
 def fetch_products(headers, page, per_page, category_id, search):
     url = f"{BASE_URL}/api/v1/store/getNomenclatures?limit={per_page}&page={page}"
     if category_id:
+        # Тестируем разные варианты фильтра — ищем рабочий
+        variants = ["groupId", "group_id", "group", "id", "nomenklatura_group_id"]
+        for v in variants:
+            test_url = f"{BASE_URL}/api/v1/store/getNomenclatures?limit=1&page=1&filter[{v}]={category_id}"
+            try:
+                req = urllib.request.Request(test_url, headers=headers)
+                with urllib.request.urlopen(req, timeout=10) as r:
+                    data = json.loads(r.read().decode())
+                    cnt = data.get('count', '?')
+                    print(f"[filter_test] filter[{v}]={category_id} → count={cnt}")
+            except Exception as e:
+                print(f"[filter_test] filter[{v}] error: {e}")
         url += f"&filter[groupId]={category_id}"
     if search:
         url += f"&filter[name]={urllib.parse.quote(search)}"
