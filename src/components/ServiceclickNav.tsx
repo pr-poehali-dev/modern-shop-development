@@ -21,22 +21,10 @@ const navLinks = [
   "Лизинг",
 ];
 
-// Группируем категории по первой букве для имитации подкатегорий
-function groupCategories(cats: Category[]) {
-  const groups: Record<string, Category[]> = {};
-  for (const cat of cats) {
-    const letter = cat.name.trim()[0]?.toUpperCase() || "#";
-    if (!groups[letter]) groups[letter] = [];
-    groups[letter].push(cat);
-  }
-  return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b, "ru"));
-}
-
 export default function ServiceclickNav() {
   const [open, setOpen] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const panelRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -64,16 +52,10 @@ export default function ServiceclickNav() {
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  const toggleGroup = (letter: string) => {
-    setExpanded((prev) => ({ ...prev, [letter]: !prev[letter] }));
-  };
-
   const handleCategoryClick = (cat: Category) => {
     setOpen(false);
     navigate(`/catalog?category=${cat.id}`);
   };
-
-  const grouped = groupCategories(categories);
 
   return (
     <>
@@ -157,45 +139,21 @@ export default function ServiceclickNav() {
             </div>
           )}
 
-          {!loading && grouped.length === 0 && (
+          {!loading && categories.length === 0 && (
             <p className="text-xs text-gray-400 px-4 py-4">Категории не найдены</p>
           )}
 
-          {!loading && grouped.map(([letter, cats]) => (
-            <div key={letter}>
-              {/* Group header — раскрываемый */}
-              <button
-                onClick={() => toggleGroup(letter)}
-                className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wider hover:bg-gray-50 transition-colors border-b border-[#f5f5f5]"
-              >
-                <span>{letter}</span>
-                <Icon
-                  name={expanded[letter] ? "ChevronUp" : "ChevronDown"}
-                  size={13}
-                  className="text-gray-400"
-                />
-              </button>
-
-              {/* Subcategories */}
-              {expanded[letter] && (
-                <div className="bg-[#fafafa]">
-                  {cats.map((cat) => (
-                    <button
-                      key={cat.id}
-                      onClick={() => handleCategoryClick(cat)}
-                      className="w-full flex items-center justify-between px-5 py-2 text-sm text-gray-700 hover:bg-[#fff0f0] hover:text-[#e31e24] transition-colors text-left"
-                    >
-                      <span className="truncate">{cat.name}</span>
-                      {cat.count > 0 && (
-                        <span className="text-[10px] text-gray-400 ml-2 flex-shrink-0">
-                          {cat.count}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
+          {!loading && categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => handleCategoryClick(cat)}
+              className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-700 hover:bg-[#fff0f0] hover:text-[#e31e24] transition-colors border-b border-[#f5f5f5] text-left"
+            >
+              <span className="truncate">{cat.name}</span>
+              {cat.count > 0 && (
+                <span className="text-[10px] text-gray-400 ml-2 flex-shrink-0">{cat.count}</span>
               )}
-            </div>
+            </button>
           ))}
         </div>
       </div>
