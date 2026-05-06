@@ -97,10 +97,11 @@ def fetch_store_stock(headers, store_id):
     try:
         url_base = f"{BASE_URL}/api/v1/store/getStoreNomenclatures?limit={ALL_ITEMS_LIMIT}&filter[storeId]={store_id}"
         all_items = fetch_all_pages(url_base, headers)
+        # Логируем первый элемент для отладки
         stock = {}
         for item in all_items:
-            nid = item.get("nomenclatureId") or item.get("id")
-            qty = item.get("quantity", item.get("count", item.get("amount", 0)))
+            nid = item.get("id")
+            qty = item.get("stock", 0)
             if nid is not None:
                 stock[str(nid)] = qty
         return stock
