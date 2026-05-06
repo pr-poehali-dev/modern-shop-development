@@ -50,10 +50,7 @@ function ProductCard({ product }: { product: Product }) {
 
   const [imgError, setImgError] = useState(false);
 
-  const keyword = encodeURIComponent(
-    product.name.split(/[\s,"/\\(]+/).slice(0, 3).join(" ")
-  );
-  const fallbackImg = `https://source.unsplash.com/300x300/?${keyword}&sig=${product.id}`;
+  const fallbackImg = `https://picsum.photos/seed/${product.id}/300/300`;
 
   return (
     <div className="border border-[#e8e8e8] rounded-2xl overflow-hidden hover:border-[#e31e24] hover:shadow-md transition-all cursor-pointer group flex flex-col bg-white">
