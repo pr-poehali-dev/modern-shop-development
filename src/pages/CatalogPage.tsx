@@ -303,6 +303,34 @@ export default function CatalogPage() {
               </div>
             )}
 
+            {/* Склады */}
+            {stores.length > 0 && (
+              <div className="flex items-center gap-2 mb-4 flex-wrap">
+                <span className="text-xs text-gray-500 flex-shrink-0 flex items-center gap-1">
+                  <Icon name="Warehouse" size={13} /> Склад:
+                </span>
+                <button
+                  onClick={() => setFilter("store", "")}
+                  className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                    !storeId ? "bg-[#e31e24] text-white border-[#e31e24]" : "border-[#e8e8e8] bg-white text-gray-700 hover:border-[#e31e24]"
+                  }`}
+                >
+                  Все склады
+                </button>
+                {stores.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setFilter("store", String(s.id))}
+                    className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                      String(s.id) === storeId ? "bg-[#e31e24] text-white border-[#e31e24]" : "border-[#e8e8e8] bg-white text-gray-700 hover:border-[#e31e24]"
+                    }`}
+                  >
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Active search badge */}
             {search && (
               <div className="flex items-center gap-2 mb-4">
