@@ -172,16 +172,23 @@ def fetch_categories_from_products(headers):
         for p in all_items:
             gid = p.get("groupId")
             gname = p.get("groupName", "")
+            parent_gid = p.get("parentGroupId") or p.get("parentId") or None
             if gid and gid not in seen:
-                seen[gid] = gname
+                seen[gid] = {"name": gname, "parent_id": parent_gid}
             if gid:
                 counts[gid] = counts.get(gid, 0) + 1
+        # Логируем первый элемент для отладки иерархии
+        if all_items:
+            first = all_items[0]
+            print(f"[debug] product keys: {list(first.keys())}")
+            print(f"[debug] group fields: groupId={first.get('groupId')}, groupName={first.get('groupName')}, parentGroupId={first.get('parentGroupId')}, parentId={first.get('parentId')}")
         items = [
-            {"id": gid, "name": gname, "parent_id": None, "count": counts.get(gid, 0)}
-            for gid, gname in sorted(seen.items(), key=lambda x: x[1])
+            {"id": gid, "name": info["name"], "parent_id": info["parent_id"], "count": counts.get(gid, 0)}
+            for gid, info in sorted(seen.items(), key=lambda x: x[1]["name"])
         ]
         return {"items": items}
     except Exception as e:
+        print(f"[categories] error: {e}")
         return {"error": str(e), "items": []}
 
 
