@@ -5,8 +5,8 @@
       "method": "GET",
       "path": "/?action=products&page=1&per_page=12",
       "expectedStatus": 200,
-      "expectedBody": {"items": []},
-      "bodyMatcher": "partial"
+      "expectedBody": {"items": [], "total": 0, "pages": 1},
+      "bodyMatcher": "keys_exist"
     },
     {
       "name": "Получение категорий",

@@ -2,6 +2,7 @@ import os
 import json
 import urllib.request
 import urllib.error
+import urllib.parse
 
 BASE_URL = "https://pm-71723.promaster.app"
 
@@ -29,21 +30,19 @@ def handler(event: dict, context) -> dict:
 
     headers = {
         "Content-Type": "application/json",
-        "X-Token": token,
-        "Authorization": f"Bearer {token}",
-        "X-Auth-Token": token,
+        "Authorization": token,
     }
 
     print(f"[promaster] token present: {bool(token)}, action: {action}")
 
     if action == "categories":
-        data = fetch_categories(headers, token)
+        data = fetch_categories(headers)
     else:
         page = int(params.get("page", 1))
         per_page = int(params.get("per_page", 24))
         category_id = params.get("category_id", "")
         search = params.get("search", "")
-        data = fetch_products(headers, token, page, per_page, category_id, search)
+        data = fetch_products(headers, page, per_page, category_id, search)
 
     return {
         "statusCode": 200,
@@ -55,23 +54,21 @@ def handler(event: dict, context) -> dict:
     }
 
 
-def fetch_url(url_with_token, headers):
-    print(f"[promaster] fetching: {url_with_token}")
-    req = urllib.request.Request(url_with_token, headers=headers)
+def fetch_url(url, headers):
+    print(f"[promaster] fetching: {url}")
+    req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=15) as resp:
         body = resp.read().decode()
-        print(f"[promaster] response (200): {body[:300]}")
+        print(f"[promaster] response (200): {body[:500]}")
         return json.loads(body)
 
 
-def fetch_products(headers, token, page, per_page, category_id, search):
-    import urllib.parse
-    offset = (page - 1) * per_page
-    url = f"{BASE_URL}/api/v1/store/getNomenclatures?token={token}&limit={per_page}&offset={offset}"
+def fetch_products(headers, page, per_page, category_id, search):
+    url = f"{BASE_URL}/api/v1/store/getNomenclatures?limit={per_page}&page={page}"
     if category_id:
-        url += f"&category_id={category_id}"
+        url += f"&filter[category_id]={category_id}"
     if search:
-        url += f"&search={urllib.parse.quote(search)}"
+        url += f"&filter[name]={urllib.parse.quote(search)}"
 
     try:
         raw = fetch_url(url, headers)
@@ -86,8 +83,8 @@ def fetch_products(headers, token, page, per_page, category_id, search):
         return {"error": str(e), "items": [], "total": 0}
 
 
-def fetch_categories(headers, token):
-    url = f"{BASE_URL}/api/v1/store/getCategories?token={token}"
+def fetch_categories(headers):
+    url = f"{BASE_URL}/api/v1/store/getCategories"
     try:
         raw = fetch_url(url, headers)
         print(f"[promaster] categories raw keys: {list(raw.keys()) if isinstance(raw, dict) else type(raw)}")
@@ -104,13 +101,17 @@ def fetch_categories(headers, token):
 def normalize_products(raw):
     """Нормализует ответ ProMaster к единому формату"""
     if isinstance(raw, dict):
-        items_raw = raw.get("data", raw.get("items", raw.get("nomenclatures", [])))
-        total = raw.get("total", raw.get("count", len(items_raw)))
+        items_raw = raw.get("items", raw.get("data", raw.get("nomenclatures", [])))
+        total = raw.get("count", raw.get("total", len(items_raw)))
+        pages = raw.get("pages", 1)
+        page_current = raw.get("pageCurrent", 1)
     elif isinstance(raw, list):
         items_raw = raw
         total = len(raw)
+        pages = 1
+        page_current = 1
     else:
-        return {"items": [], "total": 0, "raw": raw}
+        return {"items": [], "total": 0, "raw": str(raw)}
 
     items = []
     for p in items_raw:
@@ -136,16 +137,16 @@ def normalize_products(raw):
             "in_stock": p.get("in_stock", p.get("quantity", 1)) not in [0, "0", False],
         })
 
-    return {"items": items, "total": total}
+    return {"items": items, "total": total, "pages": pages, "page_current": page_current}
 
 
 def normalize_categories(raw):
     if isinstance(raw, dict):
-        items_raw = raw.get("data", raw.get("items", raw.get("categories", [])))
+        items_raw = raw.get("items", raw.get("data", raw.get("categories", [])))
     elif isinstance(raw, list):
         items_raw = raw
     else:
-        return {"items": [], "raw": raw}
+        return {"items": [], "raw": str(raw)}
 
     items = []
     for c in items_raw:
