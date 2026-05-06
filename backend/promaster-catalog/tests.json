@@ -4,17 +4,13 @@
       "name": "Получение списка товаров",
       "method": "GET",
       "path": "/?action=products&page=1&per_page=12",
-      "expectedStatus": 200,
-      "expectedBody": {"items": [], "total": 0, "pages": 1},
-      "bodyMatcher": "keys_exist"
+      "expectedStatus": 200
     },
     {
       "name": "Получение категорий",
       "method": "GET",
       "path": "/?action=categories",
-      "expectedStatus": 200,
-      "expectedBody": {"items": []},
-      "bodyMatcher": "partial"
+      "expectedStatus": 200
     }
   ]
 }

@@ -84,7 +84,7 @@ def fetch_products(headers, page, per_page, category_id, search):
 
 
 def fetch_categories(headers):
-    url = f"{BASE_URL}/api/v1/store/getCategories"
+    url = f"{BASE_URL}/api/v1/store/getGroups"
     try:
         raw = fetch_url(url, headers)
         print(f"[promaster] categories raw keys: {list(raw.keys()) if isinstance(raw, dict) else type(raw)}")
