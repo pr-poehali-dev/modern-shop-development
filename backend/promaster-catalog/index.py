@@ -39,6 +39,21 @@ def handler(event: dict, context) -> dict:
 
     if action == "categories":
         data = fetch_categories_from_products(headers)
+    elif action == "debug_raw":
+        # Временный action — ищем группы по имени
+        search_name = params.get("search", "").lower()
+        all_items = fetch_all_pages(f"{BASE_URL}/api/v1/store/getNomenclatures?limit={ALL_ITEMS_LIMIT}", headers)
+        seen = {}
+        for p in all_items:
+            gid = p.get("groupId")
+            gname = p.get("groupName", "")
+            if gid not in seen:
+                seen[gid] = gname
+        if search_name:
+            result = [{"id": gid, "name": gname} for gid, gname in seen.items() if search_name in gname.lower()]
+        else:
+            result = [{"id": gid, "name": gname} for gid, gname in sorted(seen.items(), key=lambda x: x[1])]
+        data = {"groups": result, "total": len(result)}
     elif action == "stores":
         data = fetch_stores(headers)
     else:
