@@ -15,7 +15,7 @@ const categories = [
   { name: "Климатическая\nтехника", icon: "AirVent", color: "#e3f2fd" },
 ];
 
-export default function CitilinkCategories() {
+export default function ServiceclickCategories() {
   return (
     <div className="max-w-[1200px] mx-auto px-4 py-4">
       <h2 className="text-lg font-bold text-gray-900 mb-3">Популярные категории</h2>

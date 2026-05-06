@@ -32,7 +32,7 @@ function groupCategories(cats: Category[]) {
   return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b, "ru"));
 }
 
-export default function CitilinkNav() {
+export default function ServiceclickNav() {
   const [open, setOpen] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);

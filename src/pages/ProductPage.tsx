@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
-import CitilinkHeader from "@/components/CitilinkHeader";
-import CitilinkNav from "@/components/CitilinkNav";
-import CitilinkFooter from "@/components/CitilinkFooter";
+import ServiceclickHeader from "@/components/CitilinkHeader";
+import ServiceclickNav from "@/components/CitilinkNav";
+import ServiceclickFooter from "@/components/CitilinkFooter";
 
 export const PRODUCTS = [
   {
@@ -179,12 +179,12 @@ export default function ProductPage() {
   if (!product) {
     return (
       <div className="min-h-screen flex flex-col">
-        <CitilinkHeader />
-        <CitilinkNav />
+        <ServiceclickHeader />
+        <ServiceclickNav />
         <div className="flex-1 flex items-center justify-center text-gray-500 text-lg">
           Товар не найден
         </div>
-        <CitilinkFooter />
+        <ServiceclickFooter />
       </div>
     );
   }
@@ -195,8 +195,8 @@ export default function ProductPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f2f2f2]">
-      <CitilinkHeader />
-      <CitilinkNav />
+      <ServiceclickHeader />
+      <ServiceclickNav />
 
       <main className="flex-1">
         <div className="max-w-[1200px] mx-auto px-4 py-4">
@@ -350,7 +350,7 @@ export default function ProductPage() {
         </div>
       </main>
 
-      <CitilinkFooter />
+      <ServiceclickFooter />
     </div>
   );
 }

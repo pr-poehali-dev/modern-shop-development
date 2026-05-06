@@ -85,7 +85,7 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
-export default function CitilinkProducts() {
+export default function ServiceclickProducts() {
   const navigate = useNavigate();
   return (
     <div className="max-w-[1200px] mx-auto px-4 py-4">

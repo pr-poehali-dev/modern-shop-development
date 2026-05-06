@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 
-export default function CitilinkHeader() {
+export default function ServiceclickHeader() {
   const [cartCount] = useState(3);
   const [query, setQuery] = useState("");
 
@@ -28,7 +28,7 @@ export default function CitilinkHeader() {
         {/* Logo */}
         <a href="/" className="flex-shrink-0">
           <div className="text-white font-bold text-2xl tracking-tight">
-            <span className="text-white text-3xl font-black italic">Ситилинк</span>
+            <span className="text-white text-3xl font-black italic">Serviceclick</span>
           </div>
         </a>
 

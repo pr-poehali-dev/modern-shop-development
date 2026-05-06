@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import CitilinkHeader from "@/components/CitilinkHeader";
-import CitilinkNav from "@/components/CitilinkNav";
-import CitilinkFooter from "@/components/CitilinkFooter";
+import ServiceclickHeader from "@/components/CitilinkHeader";
+import ServiceclickNav from "@/components/CitilinkNav";
+import ServiceclickFooter from "@/components/CitilinkFooter";
 import Icon from "@/components/ui/icon";
 
 const API_URL = "https://functions.poehali.dev/c7265605-961b-48cb-9594-4caad2cb333e";
@@ -223,8 +223,8 @@ export default function CatalogPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f5f5f5]">
-      <CitilinkHeader />
-      <CitilinkNav />
+      <ServiceclickHeader />
+      <ServiceclickNav />
 
       <main className="flex-1 max-w-[1200px] mx-auto w-full px-4 py-6">
 
@@ -481,7 +481,7 @@ export default function CatalogPage() {
         </div>
       </main>
 
-      <CitilinkFooter />
+      <ServiceclickFooter />
     </div>
   );
 }

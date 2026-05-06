@@ -68,7 +68,7 @@ function getEndOfDay() {
   return Math.floor((end.getTime() - now.getTime()) / 1000);
 }
 
-export default function CitilinkDailyDeals() {
+export default function ServiceclickDailyDeals() {
   const navigate = useNavigate();
   const [offset, setOffset] = useState(0);
   const [animating, setAnimating] = useState(false);

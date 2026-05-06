@@ -7,14 +7,14 @@ const footerLinks = {
   "Помощь": ["Часто задаваемые вопросы", "Обратная связь", "Пожаловаться", "Публичная оферта"],
 };
 
-export default function CitilinkFooter() {
+export default function ServiceclickFooter() {
   return (
     <footer className="bg-[#1a1a1a] text-white mt-6">
       <div className="max-w-[1200px] mx-auto px-4 py-10">
         <div className="grid grid-cols-5 gap-8">
           {/* Logo & contacts */}
           <div>
-            <div className="text-2xl font-black italic mb-3">Ситилинк</div>
+            <div className="text-2xl font-black italic mb-3">Serviceclick</div>
             <p className="text-gray-400 text-sm mb-3">Интернет-магазин электроники и бытовой техники</p>
             <div className="flex flex-col gap-2 text-sm">
               <a href="tel:88005005555" className="text-white hover:text-[#e31e24] flex items-center gap-2">
@@ -55,7 +55,7 @@ export default function CitilinkFooter() {
 
         {/* Bottom */}
         <div className="border-t border-[#2d2d2d] mt-8 pt-6 flex items-center justify-between">
-          <p className="text-gray-500 text-xs">© 2025 Ситилинк. Все права защищены.</p>
+          <p className="text-gray-500 text-xs">© 2025 Serviceclick. Все права защищены.</p>
           <div className="flex gap-3">
             {["Visa", "MasterCard", "МИР", "SberPay"].map((p) => (
               <span key={p} className="bg-[#2d2d2d] text-gray-400 text-xs px-2 py-1 rounded">

@@ -31,7 +31,7 @@ const slides = [
 const TOTAL = slides.length;
 const INTERVAL = 5000;
 
-export default function CitilinkHero() {
+export default function ServiceclickHero() {
   const [current, setCurrent] = useState(0);
   const [prev, setPrev] = useState<number | null>(null);
   const [direction, setDirection] = useState<"next" | "prev">("next");
@@ -190,7 +190,7 @@ export default function CitilinkHero() {
 
         {/* Disclaimer */}
         <p className="absolute bottom-2 left-4 z-20 text-[10px] text-gray-400">
-          Реклама. Рекламодатель: ООО «Ситилинк»
+          Реклама. Рекламодатель: ООО «Serviceclick»
         </p>
       </div>
 

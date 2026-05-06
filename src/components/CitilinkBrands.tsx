@@ -1,6 +1,6 @@
 const brands = ["Apple", "Samsung", "LG", "Xiaomi", "Sony", "Lenovo", "HP", "ASUS", "Bosch", "Philips"];
 
-export default function CitilinkBrands() {
+export default function ServiceclickBrands() {
   return (
     <div className="max-w-[1200px] mx-auto px-4 py-4">
       <h2 className="text-lg font-bold text-gray-900 mb-3">Популярные бренды</h2>
