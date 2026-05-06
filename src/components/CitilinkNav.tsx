@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 
 const categories = [
@@ -28,6 +29,7 @@ const navLinks = [
 
 export default function CitilinkNav() {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <nav className="bg-white border-b border-[#e0e0e0] relative z-50">
@@ -35,6 +37,7 @@ export default function CitilinkNav() {
         {/* Catalog trigger */}
         <div className="relative">
           <button
+            onClick={() => navigate("/catalog")}
             onMouseEnter={() => setOpen(true)}
             onMouseLeave={() => setOpen(false)}
             className="flex items-center gap-2 font-semibold text-sm text-[#e31e24] hover:text-[#c41920] h-11 px-1"
