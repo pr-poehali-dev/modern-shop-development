@@ -62,7 +62,12 @@ def handler(event: dict, context) -> dict:
         category_id = params.get("category_id", "")
         search = params.get("search", "").strip().lower()
         store_id = params.get("store_id", "")
-        data = fetch_products_filtered(headers, page, per_page, category_id, search, store_id)
+        price_min = params.get("price_min", "")
+        price_max = params.get("price_max", "")
+        in_stock = params.get("in_stock", "")
+        sort = params.get("sort", "")
+        sku_search = params.get("sku_search", "").strip()
+        data = fetch_products_filtered(headers, page, per_page, category_id, search, store_id, price_min, price_max, in_stock, sort, sku_search)
 
     return {
         "statusCode": 200,
@@ -134,9 +139,8 @@ def fetch_all_stores_stock(headers, stores):
     return all_stock
 
 
-def fetch_products_filtered(headers, page, per_page, category_id, search, store_id):
+def fetch_products_filtered(headers, page, per_page, category_id, search, store_id, price_min="", price_max="", in_stock="", sort="", sku_search=""):
     try:
-        # Загружаем товары и склады параллельно (последовательно, но оба нужны)
         all_items = fetch_all_pages(
             f"{BASE_URL}/api/v1/store/getNomenclatures?limit={ALL_ITEMS_LIMIT}", headers
         )
@@ -147,29 +151,68 @@ def fetch_products_filtered(headers, page, per_page, category_id, search, store_
             for s in stores_raw.get("items", [])
         ]
 
-        # Остатки по всем складам
         all_stock = fetch_all_stores_stock(headers, stores)
+
+        # Нормализуем все товары сразу для фильтрации по цене и наличию
+        normalized = [normalize_product(p, stores, all_stock) for p in all_items]
 
         # Фильтр по категории
         if category_id:
-            all_items = [p for p in all_items if str(p.get("groupId", "")) == str(category_id)]
+            normalized = [p for p in normalized if str(p.get("category_id", "")) == str(category_id)]
 
-        # Фильтр по поиску
+        # Фильтр по поиску (имя)
         if search:
-            all_items = [p for p in all_items if search in p.get("name", "").lower()]
+            normalized = [p for p in normalized if search in p.get("name", "").lower()]
 
-        # Фильтр по складу (только товары с остатком > 0)
+        # Фильтр по артикулу
+        if sku_search:
+            normalized = [p for p in normalized if sku_search.lower() in (p.get("sku") or "").lower()]
+
+        # Фильтр по складу
         if store_id:
-            store_stock = all_stock.get(int(store_id), {})
-            all_items = [p for p in all_items if store_stock.get(str(p.get("id")), 0) > 0]
+            normalized = [p for p in normalized if any(
+                s["store_id"] == int(store_id) and s["quantity"] > 0
+                for s in p.get("stock_by_store", [])
+            )]
 
-        total = len(all_items)
+        # Фильтр только в наличии
+        if in_stock == "1":
+            normalized = [p for p in normalized if p.get("in_stock")]
+
+        # Фильтр по цене
+        if price_min:
+            try:
+                pmin = float(price_min)
+                normalized = [p for p in normalized if p.get("price", 0) >= pmin]
+            except ValueError:
+                pass
+        if price_max:
+            try:
+                pmax = float(price_max)
+                normalized = [p for p in normalized if 0 < p.get("price", 0) <= pmax]
+            except ValueError:
+                pass
+
+        # Сортировка
+        if sort == "price_asc":
+            normalized = sorted(normalized, key=lambda p: p.get("price", 0))
+        elif sort == "price_desc":
+            normalized = sorted(normalized, key=lambda p: p.get("price", 0), reverse=True)
+        elif sort == "name_asc":
+            normalized = sorted(normalized, key=lambda p: p.get("name", ""))
+        elif sort == "name_desc":
+            normalized = sorted(normalized, key=lambda p: p.get("name", ""), reverse=True)
+
+        # Диапазон цен для фронтенда
+        prices = [p["price"] for p in normalized if p.get("price", 0) > 0]
+        price_range = {"min": int(min(prices)) if prices else 0, "max": int(max(prices)) if prices else 0}
+
+        total = len(normalized)
         offset = (page - 1) * per_page
-        page_items = all_items[offset:offset + per_page]
+        page_items = normalized[offset:offset + per_page]
         pages = max(1, (total + per_page - 1) // per_page)
 
-        items = [normalize_product(p, stores, all_stock) for p in page_items]
-        return {"items": items, "total": total, "pages": pages, "page_current": page, "stores": stores}
+        return {"items": page_items, "total": total, "pages": pages, "page_current": page, "stores": stores, "price_range": price_range}
 
     except Exception as e:
         print(f"[promaster] error: {e}")
