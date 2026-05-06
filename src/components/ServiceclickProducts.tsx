@@ -125,6 +125,7 @@ export default function ServiceclickProducts() {
 
             {/* Info */}
             <div className="p-3 flex flex-col flex-1">
+              {p.code && <p className="text-[10px] text-gray-400 mb-1">Арт. {p.code}</p>}
               <p className="text-xs text-gray-800 leading-tight line-clamp-2 mb-2 flex-1">{p.name}</p>
 
               <div className="flex items-center gap-1 mb-2">
