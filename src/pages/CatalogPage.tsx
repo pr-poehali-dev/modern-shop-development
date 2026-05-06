@@ -218,6 +218,11 @@ export default function CatalogPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f5f5f5]">
+      {loading && (
+        <div className="fixed top-0 left-0 right-0 z-50 h-1 bg-red-100 overflow-hidden">
+          <div className="h-full bg-[#e31e24] animate-progress" />
+        </div>
+      )}
       <ServiceclickHeader />
       <ServiceclickNav />
 
