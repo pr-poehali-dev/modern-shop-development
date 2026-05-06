@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
-import ServiceclickHeader from "@/components/CitilinkHeader";
-import ServiceclickNav from "@/components/CitilinkNav";
-import ServiceclickFooter from "@/components/CitilinkFooter";
+import ServiceclickHeader from "@/components/ServiceclickHeader";
+import ServiceclickNav from "@/components/ServiceclickNav";
+import ServiceclickFooter from "@/components/ServiceclickFooter";
 
 export const PRODUCTS = [
   {

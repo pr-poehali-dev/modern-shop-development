@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import ServiceclickHeader from "@/components/CitilinkHeader";
-import ServiceclickNav from "@/components/CitilinkNav";
-import ServiceclickFooter from "@/components/CitilinkFooter";
+import ServiceclickHeader from "@/components/ServiceclickHeader";
+import ServiceclickNav from "@/components/ServiceclickNav";
+import ServiceclickFooter from "@/components/ServiceclickFooter";
 import Icon from "@/components/ui/icon";
 
 const API_URL = "https://functions.poehali.dev/c7265605-961b-48cb-9594-4caad2cb333e";
