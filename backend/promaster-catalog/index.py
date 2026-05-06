@@ -231,6 +231,7 @@ def normalize_product(p, stores, all_stock):
             "quantity": qty,
         })
 
+    sku = p.get("partNumber") or p.get("barCode") or ""
     return {
         "id": p.get("id", ""),
         "name": p.get("name", ""),
@@ -239,7 +240,7 @@ def normalize_product(p, stores, all_stock):
         "image": image,
         "category_id": p.get("groupId", ""),
         "category_name": p.get("groupName", ""),
-        "sku": p.get("partNumber", p.get("barCode", "")),
+        "sku": sku,
         "unit": p.get("unit", ""),
         "description": p.get("description", ""),
         "in_stock": total_qty > 0,
