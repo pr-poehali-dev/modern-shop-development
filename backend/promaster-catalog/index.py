@@ -126,39 +126,28 @@ def fetch_categories_from_products(headers):
 
 
 def explore_stock_endpoints(headers):
-    """Разведка: ищем endpoint'ы для остатков по складам"""
+    """Разведка: смотрим склады и все поля первого товара"""
     results = {}
-    endpoints = [
-        "/api/v1/store/getRemains",
-        "/api/v1/store/getWarehouses",
-        "/api/v1/store/getStores",
-        "/api/v1/store/getStock",
-        "/api/v1/store/getStorages",
-        "/api/v1/store/getNomenclatureRemains",
-        "/api/v1/store/getNomenclaturesWithRemains",
-        "/api/v1/store/getBalance",
-    ]
-    for ep in endpoints:
-        url = f"{BASE_URL}{ep}?limit=3"
-        try:
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                body = resp.read().decode()
-                results[ep] = json.loads(body)
-        except urllib.error.HTTPError as e:
-            results[ep] = {"http_error": e.code}
-        except Exception as e:
-            results[ep] = {"error": str(e)}
-    # Также проверим, есть ли у товара поле с остатками
+    # Склады
+    url = f"{BASE_URL}/api/v1/store/getStores?limit=50"
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            results["getStores"] = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        results["getStores"] = {"http_error": e.code, "body": e.read().decode()[:300]}
+    except Exception as e:
+        results["getStores"] = {"error": str(e)}
+    # Все поля первого товара
     url = f"{BASE_URL}/api/v1/store/getNomenclatures?limit=1&page=1"
     try:
         req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, timeout=10) as resp:
             raw = json.loads(resp.read().decode())
             first_item = raw.get("items", [{}])[0]
-            results["_nomenclature_all_fields"] = {k: v for k, v in first_item.items()}
+            results["nomenclature_fields"] = first_item
     except Exception as e:
-        results["_nomenclature_all_fields"] = {"error": str(e)}
+        results["nomenclature_fields"] = {"error": str(e)}
     return results
 
 
