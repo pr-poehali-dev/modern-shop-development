@@ -50,22 +50,20 @@ function ProductCard({ product }: { product: Product }) {
 
   const [imgError, setImgError] = useState(false);
 
+  const keyword = encodeURIComponent(
+    product.name.split(/[\s,"/\\(]+/).slice(0, 3).join(" ")
+  );
+  const fallbackImg = `https://source.unsplash.com/300x300/?${keyword}&sig=${product.id}`;
+
   return (
     <div className="border border-[#e8e8e8] rounded-2xl overflow-hidden hover:border-[#e31e24] hover:shadow-md transition-all cursor-pointer group flex flex-col bg-white">
       <div className="relative bg-[#f8f8f8] flex items-center justify-center" style={{ height: 180 }}>
-        {product.image && !imgError ? (
-          <img
-            src={product.image}
-            alt={product.name}
-            className="w-full h-full object-contain p-3"
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <div className="flex flex-col items-center justify-center text-gray-300 gap-2">
-            <Icon name="Package" size={40} />
-            <span className="text-xs">Нет фото</span>
-          </div>
-        )}
+        <img
+          src={imgError || !product.image ? fallbackImg : product.image}
+          alt={product.name}
+          className="w-full h-full object-cover"
+          onError={() => setImgError(true)}
+        />
         {discount && (
           <span className="absolute bottom-2 left-2 bg-[#e31e24] text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
             -{discount}%

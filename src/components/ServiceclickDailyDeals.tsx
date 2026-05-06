@@ -10,7 +10,7 @@ const deals = [
     oldPrice: 62990,
     rating: 4.7,
     reviews: 234,
-    image: "https://cdn.poehali.dev/projects/4e0a44ed-16f9-41e2-b08b-ecbe04285669/files/94037c4d-73ce-4b5b-84df-b945f301fe10.jpg",
+    image: "https://cdn.poehali.dev/projects/4e0a44ed-16f9-41e2-b08b-ecbe04285669/files/3e590398-3f45-404b-a61c-0071cbb9c20d.jpg",
   },
   {
     id: 2,
@@ -19,7 +19,7 @@ const deals = [
     oldPrice: 42999,
     rating: 4.8,
     reviews: 512,
-    image: "https://cdn.poehali.dev/projects/4e0a44ed-16f9-41e2-b08b-ecbe04285669/files/fdd16d79-39dd-4bf1-9217-a99a6eb4949b.jpg",
+    image: "https://cdn.poehali.dev/projects/4e0a44ed-16f9-41e2-b08b-ecbe04285669/files/854b5416-627d-454f-9d1b-0179ad373207.jpg",
   },
   {
     id: 3,
@@ -28,7 +28,7 @@ const deals = [
     oldPrice: 67990,
     rating: 4.6,
     reviews: 89,
-    image: "https://cdn.poehali.dev/projects/4e0a44ed-16f9-41e2-b08b-ecbe04285669/files/1fed0e77-3402-4c81-a16b-2a8660c68428.jpg",
+    image: "https://cdn.poehali.dev/projects/4e0a44ed-16f9-41e2-b08b-ecbe04285669/files/e8fb9fe8-5ad9-433d-979f-7ca75e7a73fd.jpg",
   },
   {
     id: 4,
@@ -37,7 +37,7 @@ const deals = [
     oldPrice: 79990,
     rating: 4.5,
     reviews: 156,
-    image: "https://cdn.poehali.dev/projects/4e0a44ed-16f9-41e2-b08b-ecbe04285669/files/1fed0e77-3402-4c81-a16b-2a8660c68428.jpg",
+    image: "https://cdn.poehali.dev/projects/4e0a44ed-16f9-41e2-b08b-ecbe04285669/files/dfcf6c4d-a425-43d6-9301-d73b6fcd0000.jpg",
   },
   {
     id: 5,
@@ -46,7 +46,7 @@ const deals = [
     oldPrice: 29990,
     rating: 4.9,
     reviews: 876,
-    image: "https://cdn.poehali.dev/projects/4e0a44ed-16f9-41e2-b08b-ecbe04285669/files/94037c4d-73ce-4b5b-84df-b945f301fe10.jpg",
+    image: "https://cdn.poehali.dev/projects/4e0a44ed-16f9-41e2-b08b-ecbe04285669/files/764b1838-00f8-4b55-88f5-7893e9ea1a3a.jpg",
   },
   {
     id: 6,
@@ -55,7 +55,7 @@ const deals = [
     oldPrice: 49990,
     rating: 4.8,
     reviews: 341,
-    image: "https://cdn.poehali.dev/projects/4e0a44ed-16f9-41e2-b08b-ecbe04285669/files/fdd16d79-39dd-4bf1-9217-a99a6eb4949b.jpg",
+    image: "https://cdn.poehali.dev/projects/4e0a44ed-16f9-41e2-b08b-ecbe04285669/files/285c4f7a-54b9-4361-b891-afbe45ff5281.jpg",
   },
 ];
 
