@@ -29,17 +29,21 @@ def handler(event: dict, context) -> dict:
 
     headers = {
         "Content-Type": "application/json",
+        "X-Token": token,
         "Authorization": f"Bearer {token}",
+        "X-Auth-Token": token,
     }
 
+    print(f"[promaster] token present: {bool(token)}, action: {action}")
+
     if action == "categories":
-        data = fetch_categories(headers)
+        data = fetch_categories(headers, token)
     else:
         page = int(params.get("page", 1))
         per_page = int(params.get("per_page", 24))
         category_id = params.get("category_id", "")
         search = params.get("search", "")
-        data = fetch_products(headers, page, per_page, category_id, search)
+        data = fetch_products(headers, token, page, per_page, category_id, search)
 
     return {
         "statusCode": 200,
@@ -51,37 +55,49 @@ def handler(event: dict, context) -> dict:
     }
 
 
-def fetch_products(headers, page, per_page, category_id, search):
+def fetch_url(url_with_token, headers):
+    print(f"[promaster] fetching: {url_with_token}")
+    req = urllib.request.Request(url_with_token, headers=headers)
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        body = resp.read().decode()
+        print(f"[promaster] response (200): {body[:300]}")
+        return json.loads(body)
+
+
+def fetch_products(headers, token, page, per_page, category_id, search):
+    import urllib.parse
     offset = (page - 1) * per_page
-    url = f"{BASE_URL}/api/v1/store/getNomenclatures?limit={per_page}&offset={offset}"
+    url = f"{BASE_URL}/api/v1/store/getNomenclatures?token={token}&limit={per_page}&offset={offset}"
     if category_id:
         url += f"&category_id={category_id}"
     if search:
         url += f"&search={urllib.parse.quote(search)}"
 
     try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            raw = json.loads(resp.read().decode())
-            return normalize_products(raw)
+        raw = fetch_url(url, headers)
+        print(f"[promaster] raw keys: {list(raw.keys()) if isinstance(raw, dict) else type(raw)}")
+        return normalize_products(raw)
     except urllib.error.HTTPError as e:
         body = e.read().decode()
+        print(f"[promaster] HTTP error {e.code}: {body[:300]}")
         return {"error": f"HTTP {e.code}", "detail": body, "items": [], "total": 0}
     except Exception as e:
+        print(f"[promaster] error: {e}")
         return {"error": str(e), "items": [], "total": 0}
 
 
-def fetch_categories(headers):
-    url = f"{BASE_URL}/api/v1/store/getCategories"
+def fetch_categories(headers, token):
+    url = f"{BASE_URL}/api/v1/store/getCategories?token={token}"
     try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            raw = json.loads(resp.read().decode())
-            return normalize_categories(raw)
+        raw = fetch_url(url, headers)
+        print(f"[promaster] categories raw keys: {list(raw.keys()) if isinstance(raw, dict) else type(raw)}")
+        return normalize_categories(raw)
     except urllib.error.HTTPError as e:
         body = e.read().decode()
+        print(f"[promaster] categories HTTP error {e.code}: {body[:300]}")
         return {"error": f"HTTP {e.code}", "detail": body, "items": []}
     except Exception as e:
+        print(f"[promaster] categories error: {e}")
         return {"error": str(e), "items": []}
 
 
