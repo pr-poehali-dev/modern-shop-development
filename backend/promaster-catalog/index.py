@@ -10,8 +10,11 @@ ALL_ITEMS_LIMIT = 500
 
 def handler(event: dict, context) -> dict:
     """
-    Прокси для ProMaster API — получение номенклатуры (каталога товаров).
-    Фильтрация по группе выполняется на бэкенде, т.к. API не поддерживает filter.
+    Прокси для ProMaster API — каталог товаров с остатками по складам.
+    Фильтрация по группе выполняется на бэкенде, т.к. API игнорирует filter.
+    action=products — список товаров с остатками
+    action=categories — группы из товаров
+    action=stores — список складов
     """
     if event.get("httpMethod") == "OPTIONS":
         return {
@@ -36,14 +39,15 @@ def handler(event: dict, context) -> dict:
 
     if action == "categories":
         data = fetch_categories_from_products(headers)
-    elif action == "explore_stock":
-        data = explore_stock_endpoints(headers)
+    elif action == "stores":
+        data = fetch_stores(headers)
     else:
         page = int(params.get("page", 1))
         per_page = int(params.get("per_page", 24))
         category_id = params.get("category_id", "")
         search = params.get("search", "").strip().lower()
-        data = fetch_products_filtered(headers, page, per_page, category_id, search)
+        store_id = params.get("store_id", "")
+        data = fetch_products_filtered(headers, page, per_page, category_id, search, store_id)
 
     return {
         "statusCode": 200,
@@ -55,45 +59,101 @@ def handler(event: dict, context) -> dict:
     }
 
 
-def fetch_all_products(headers):
-    """Загружает все товары постранично"""
+def fetch_url(url, headers):
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read().decode())
+
+
+def fetch_all_pages(url_base, headers):
+    """Загружает все страницы постранично"""
     all_items = []
     page = 1
     while True:
-        url = f"{BASE_URL}/api/v1/store/getNomenclatures?limit={ALL_ITEMS_LIMIT}&page={page}"
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            raw = json.loads(resp.read().decode())
+        raw = fetch_url(f"{url_base}&page={page}", headers)
         items = raw.get("items", [])
         all_items.extend(items)
-        total_pages = raw.get("pages", 1)
-        if page >= total_pages:
+        if page >= raw.get("pages", 1):
             break
         page += 1
     return all_items
 
 
-def fetch_products_filtered(headers, page, per_page, category_id, search):
+def fetch_stores(headers):
+    """Список складов"""
     try:
-        all_items = fetch_all_products(headers)
+        raw = fetch_url(f"{BASE_URL}/api/v1/store/getStores?limit=100", headers)
+        items = [
+            {"id": s.get("id"), "name": s.get("name", ""), "main": s.get("main", False)}
+            for s in raw.get("items", [])
+        ]
+        return {"items": items}
+    except Exception as e:
+        return {"error": str(e), "items": []}
 
-        # Фильтруем по groupId
+
+def fetch_store_stock(headers, store_id):
+    """Остатки по конкретному складу — возвращает dict {nomenclatureId: quantity}"""
+    try:
+        url_base = f"{BASE_URL}/api/v1/store/getStoreNomenclatures?limit={ALL_ITEMS_LIMIT}&filter[storeId]={store_id}"
+        all_items = fetch_all_pages(url_base, headers)
+        stock = {}
+        for item in all_items:
+            nid = item.get("nomenclatureId") or item.get("id")
+            qty = item.get("quantity", item.get("count", item.get("amount", 0)))
+            if nid is not None:
+                stock[str(nid)] = qty
+        return stock
+    except Exception as e:
+        print(f"[stock] store_id={store_id} error: {e}")
+        return {}
+
+
+def fetch_all_stores_stock(headers, stores):
+    """Остатки по всем складам — {store_id: {nomenclatureId: qty}}"""
+    all_stock = {}
+    for store in stores:
+        sid = store["id"]
+        all_stock[sid] = fetch_store_stock(headers, sid)
+    return all_stock
+
+
+def fetch_products_filtered(headers, page, per_page, category_id, search, store_id):
+    try:
+        # Загружаем товары и склады параллельно (последовательно, но оба нужны)
+        all_items = fetch_all_pages(
+            f"{BASE_URL}/api/v1/store/getNomenclatures?limit={ALL_ITEMS_LIMIT}", headers
+        )
+
+        stores_raw = fetch_url(f"{BASE_URL}/api/v1/store/getStores?limit=100", headers)
+        stores = [
+            {"id": s.get("id"), "name": s.get("name", ""), "main": s.get("main", False)}
+            for s in stores_raw.get("items", [])
+        ]
+
+        # Остатки по всем складам
+        all_stock = fetch_all_stores_stock(headers, stores)
+
+        # Фильтр по категории
         if category_id:
             all_items = [p for p in all_items if str(p.get("groupId", "")) == str(category_id)]
 
-        # Фильтруем по поиску
+        # Фильтр по поиску
         if search:
             all_items = [p for p in all_items if search in p.get("name", "").lower()]
 
-        total = len(all_items)
+        # Фильтр по складу (только товары с остатком > 0)
+        if store_id:
+            store_stock = all_stock.get(int(store_id), {})
+            all_items = [p for p in all_items if store_stock.get(str(p.get("id")), 0) > 0]
 
-        # Пагинация
+        total = len(all_items)
         offset = (page - 1) * per_page
         page_items = all_items[offset:offset + per_page]
         pages = max(1, (total + per_page - 1) // per_page)
 
-        items = [normalize_product(p) for p in page_items]
-        return {"items": items, "total": total, "pages": pages, "page_current": page}
+        items = [normalize_product(p, stores, all_stock) for p in page_items]
+        return {"items": items, "total": total, "pages": pages, "page_current": page, "stores": stores}
 
     except Exception as e:
         print(f"[promaster] error: {e}")
@@ -101,76 +161,64 @@ def fetch_products_filtered(headers, page, per_page, category_id, search):
 
 
 def fetch_categories_from_products(headers):
-    """Собирает уникальные группы прямо из товаров — так id совпадают с groupId"""
+    """Собирает уникальные группы из товаров — id гарантированно совпадают с groupId"""
     try:
-        all_items = fetch_all_products(headers)
+        all_items = fetch_all_pages(
+            f"{BASE_URL}/api/v1/store/getNomenclatures?limit={ALL_ITEMS_LIMIT}", headers
+        )
         seen = {}
+        counts = {}
         for p in all_items:
             gid = p.get("groupId")
             gname = p.get("groupName", "")
             if gid and gid not in seen:
                 seen[gid] = gname
-        items = [{"id": gid, "name": gname, "parent_id": None, "count": 0} for gid, gname in sorted(seen.items(), key=lambda x: x[1])]
-        # Проставляем count
-        counts = {}
-        for p in all_items:
-            gid = p.get("groupId")
             if gid:
                 counts[gid] = counts.get(gid, 0) + 1
-        for item in items:
-            item["count"] = counts.get(item["id"], 0)
+        items = [
+            {"id": gid, "name": gname, "parent_id": None, "count": counts.get(gid, 0)}
+            for gid, gname in sorted(seen.items(), key=lambda x: x[1])
+        ]
         return {"items": items}
     except Exception as e:
-        print(f"[promaster] categories error: {e}")
         return {"error": str(e), "items": []}
 
 
-def explore_stock_endpoints(headers):
-    """Разведка: смотрим склады и все поля первого товара"""
-    results = {}
-    # Склады
-    url = f"{BASE_URL}/api/v1/store/getStores?limit=50"
-    try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            results["getStores"] = json.loads(resp.read().decode())
-    except urllib.error.HTTPError as e:
-        results["getStores"] = {"http_error": e.code, "body": e.read().decode()[:300]}
-    except Exception as e:
-        results["getStores"] = {"error": str(e)}
-    # Все поля первого товара
-    url = f"{BASE_URL}/api/v1/store/getNomenclatures?limit=1&page=1"
-    try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            raw = json.loads(resp.read().decode())
-            first_item = raw.get("items", [{}])[0]
-            results["nomenclature_fields"] = first_item
-    except Exception as e:
-        results["nomenclature_fields"] = {"error": str(e)}
-    return results
-
-
-def normalize_product(p):
-    price = p.get("price", 0)
-    old_price = p.get("old_price", None)
+def normalize_product(p, stores, all_stock):
     images = p.get("images", [])
     image = ""
     if images and isinstance(images, list):
-        image = images[0].get("url", images[0]) if isinstance(images[0], dict) else images[0]
+        first = images[0]
+        image = first.get("url", first) if isinstance(first, dict) else first
     if image and not str(image).startswith("http"):
         image = f"{BASE_URL}{image}"
+
+    pid = str(p.get("id", ""))
+
+    # Остатки по каждому складу
+    stock_by_store = []
+    total_qty = 0
+    for store in stores:
+        sid = store["id"]
+        qty = all_stock.get(sid, {}).get(pid, 0)
+        total_qty += qty
+        stock_by_store.append({
+            "store_id": sid,
+            "store_name": store["name"],
+            "quantity": qty,
+        })
 
     return {
         "id": p.get("id", ""),
         "name": p.get("name", ""),
-        "price": float(price) if price else 0,
-        "old_price": float(old_price) if old_price else None,
+        "price": float(p.get("price", 0) or 0),
+        "old_price": float(p.get("old_price")) if p.get("old_price") else None,
         "image": image,
         "category_id": p.get("groupId", ""),
         "category_name": p.get("groupName", ""),
         "sku": p.get("partNumber", p.get("barCode", "")),
         "unit": p.get("unit", ""),
         "description": p.get("description", ""),
-        "in_stock": True,
+        "in_stock": total_qty > 0,
+        "stock_by_store": stock_by_store,
     }

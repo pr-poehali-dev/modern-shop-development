@@ -8,6 +8,18 @@ import Icon from "@/components/ui/icon";
 const API_URL = "https://functions.poehali.dev/c7265605-961b-48cb-9594-4caad2cb333e";
 const PER_PAGE = 24;
 
+interface StockEntry {
+  store_id: number;
+  store_name: string;
+  quantity: number;
+}
+
+interface Store {
+  id: number;
+  name: string;
+  main: boolean;
+}
+
 interface Product {
   id: string | number;
   name: string;
@@ -20,6 +32,7 @@ interface Product {
   unit: string;
   description: string;
   in_stock: boolean;
+  stock_by_store: StockEntry[];
 }
 
 interface Category {
@@ -63,6 +76,15 @@ function ProductCard({ product }: { product: Product }) {
             <span className="text-xs text-gray-500 font-medium bg-white px-2 py-1 rounded-lg border border-gray-200">
               Нет в наличии
             </span>
+          </div>
+        )}
+        {product.in_stock && product.stock_by_store?.length > 0 && (
+          <div className="absolute top-2 right-2 flex flex-col gap-0.5 items-end">
+            {product.stock_by_store.filter(s => s.quantity > 0).map(s => (
+              <span key={s.store_id} className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium leading-tight">
+                {s.store_name.replace("Торговый склад ", "").replace("Сервисный склад", "Сервис")}: {s.quantity} {product.unit || "шт"}
+              </span>
+            ))}
           </div>
         )}
       </div>
@@ -115,6 +137,7 @@ export default function CatalogPage() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [catLoading, setCatLoading] = useState(true);
@@ -123,6 +146,7 @@ export default function CatalogPage() {
   const page = parseInt(searchParams.get("page") || "1");
   const categoryId = searchParams.get("category") || "";
   const search = searchParams.get("search") || "";
+  const storeId = searchParams.get("store") || "";
   const [searchInput, setSearchInput] = useState(search);
 
   const totalPages = Math.ceil(total / PER_PAGE);
@@ -147,6 +171,7 @@ export default function CatalogPage() {
       let url = `${API_URL}?action=products&page=${page}&per_page=${PER_PAGE}`;
       if (categoryId) url += `&category_id=${categoryId}`;
       if (search) url += `&search=${encodeURIComponent(search)}`;
+      if (storeId) url += `&store_id=${storeId}`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.error) {
@@ -156,6 +181,7 @@ export default function CatalogPage() {
       } else {
         setProducts(data.items || []);
         setTotal(data.total || 0);
+        if (data.stores?.length) setStores(data.stores);
       }
     } catch (e: unknown) {
       setError(String(e));
@@ -163,7 +189,7 @@ export default function CatalogPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, categoryId, search]);
+  }, [page, categoryId, search, storeId]);
 
   useEffect(() => {
     loadCategories();
@@ -295,6 +321,38 @@ export default function CatalogPage() {
                 <p className="text-xs text-gray-400">Категории не найдены</p>
               )}
             </div>
+
+            {/* Склады */}
+            {stores.length > 0 && (
+              <div className="bg-white rounded-2xl border border-[#e8e8e8] p-4 mt-3">
+                <h3 className="font-bold text-sm text-gray-800 mb-3">Склад</h3>
+                <ul className="space-y-0.5">
+                  <li>
+                    <button
+                      onClick={() => setFilter("store", "")}
+                      className={`w-full text-left text-sm px-2 py-1.5 rounded-lg transition-colors ${
+                        !storeId ? "bg-[#e31e24] text-white font-medium" : "text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      Все склады
+                    </button>
+                  </li>
+                  {stores.map((s) => (
+                    <li key={s.id}>
+                      <button
+                        onClick={() => setFilter("store", String(s.id))}
+                        className={`w-full text-left text-sm px-2 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
+                          String(s.id) === storeId ? "bg-[#e31e24] text-white font-medium" : "text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        <Icon name="Warehouse" size={12} />
+                        <span className="truncate">{s.name}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </aside>
 
           {/* Products grid */}
