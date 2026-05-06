@@ -66,7 +66,7 @@ def fetch_url(url, headers):
 def fetch_products(headers, page, per_page, category_id, search):
     url = f"{BASE_URL}/api/v1/store/getNomenclatures?limit={per_page}&page={page}"
     if category_id:
-        url += f"&filter[category_id]={category_id}"
+        url += f"&filter[groupId]={category_id}"
     if search:
         url += f"&filter[name]={urllib.parse.quote(search)}"
 
@@ -129,8 +129,8 @@ def normalize_products(raw):
             "price": float(price) if price else 0,
             "old_price": float(old_price) if old_price else None,
             "image": image,
-            "category_id": p.get("category_id", p.get("group_id", "")),
-            "category_name": p.get("category_name", p.get("group_name", "")),
+            "category_id": p.get("groupId", p.get("category_id", p.get("group_id", ""))),
+            "category_name": p.get("groupName", p.get("category_name", p.get("group_name", ""))),
             "sku": p.get("sku", p.get("article", p.get("code", ""))),
             "unit": p.get("unit", p.get("ed_izm", "")),
             "description": p.get("description", p.get("descr", "")),
@@ -153,7 +153,7 @@ def normalize_categories(raw):
         items.append({
             "id": c.get("id", c.get("category_id", "")),
             "name": c.get("name", c.get("title", c.get("category_name", ""))),
-            "parent_id": c.get("parent_id", None),
+            "parent_id": c.get("parentId", c.get("parent_id", None)),
             "count": c.get("count", c.get("products_count", 0)),
         })
 
