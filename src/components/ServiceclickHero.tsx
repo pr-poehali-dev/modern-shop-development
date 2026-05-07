@@ -207,6 +207,48 @@ export default function ServiceclickHero() {
     <div className="max-w-[1200px] mx-auto px-4 py-3 flex gap-3">
       {/* Main slider */}
       <div className="flex-1 relative rounded-3xl overflow-hidden min-w-0" style={{ height: 280, perspective: "1200px" }}>
+        {/* UI overlay — always on top */}
+        <div className="absolute inset-0 z-30 pointer-events-none">
+          {/* Counter + arrows */}
+          {TOTAL > 1 && (
+            <div className="absolute bottom-4 right-4 flex flex-col items-center gap-1.5 pointer-events-auto">
+              <div className="flex items-center gap-2">
+                <button onClick={handlePrev} className="w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center shadow-lg backdrop-blur-sm transition-colors">
+                  <Icon name="ChevronLeft" size={16} />
+                </button>
+                <span className="text-sm font-medium min-w-[44px] text-center drop-shadow">
+                  <span className="text-[#f47d20] font-bold">{current + 1}</span>
+                  <span className="text-white"> / {TOTAL}</span>
+                </span>
+                <button onClick={handleNext} className="w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center shadow-lg backdrop-blur-sm transition-colors">
+                  <Icon name="ChevronRight" size={16} />
+                </button>
+              </div>
+              <div className="w-[88px] h-[3px] bg-white/30 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[#f47d20] rounded-full"
+                  style={{ width: `${progress}%`, transition: progress === 0 ? "none" : "width 50ms linear" }}
+                />
+              </div>
+            </div>
+          )}
+          {/* Dots */}
+          {TOTAL > 1 && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 pointer-events-auto">
+              {slides.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => goTo(i, i > current ? "next" : "prev")}
+                  className={`rounded-full transition-all ${i === current ? "w-5 h-2 bg-[#f47d20]" : "w-2 h-2 bg-white/60 hover:bg-white"}`}
+                />
+              ))}
+            </div>
+          )}
+          <p className="absolute bottom-2 left-4 text-[10px] text-white/50">
+            Реклама. Рекламодатель: ООО «Serviceclick»
+          </p>
+        </div>
+
         {slides.map((slide, i) => (
           <div
             key={slide.id}
@@ -256,46 +298,7 @@ export default function ServiceclickHero() {
           </div>
         ))}
 
-        {/* Counter + arrows */}
-        {TOTAL > 1 && (
-          <div className="absolute bottom-4 right-4 z-20 flex flex-col items-center gap-1.5">
-            <div className="flex items-center gap-2">
-              <button onClick={handlePrev} className="w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center shadow-lg backdrop-blur-sm transition-colors">
-                <Icon name="ChevronLeft" size={16} />
-              </button>
-              <span className="text-sm font-medium min-w-[44px] text-center drop-shadow">
-                <span className="text-[#f47d20] font-bold">{current + 1}</span>
-                <span className="text-white/80"> / {TOTAL}</span>
-              </span>
-              <button onClick={handleNext} className="w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center shadow-lg backdrop-blur-sm transition-colors">
-                <Icon name="ChevronRight" size={16} />
-              </button>
-            </div>
-            <div className="w-[88px] h-[3px] bg-white/30 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-[#f47d20] rounded-full"
-                style={{ width: `${progress}%`, transition: progress === 0 ? "none" : "width 50ms linear" }}
-              />
-            </div>
-          </div>
-        )}
 
-        {/* Dots */}
-        {TOTAL > 1 && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-1.5">
-            {slides.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => goTo(i, i > current ? "next" : "prev")}
-                className={`rounded-full transition-all ${i === current ? "w-5 h-2 bg-[#f47d20]" : "w-2 h-2 bg-white/60 hover:bg-white"}`}
-              />
-            ))}
-          </div>
-        )}
-
-        <p className="absolute bottom-2 left-4 z-20 text-[10px] text-gray-400">
-          Реклама. Рекламодатель: ООО «Serviceclick»
-        </p>
       </div>
 
       {/* Right banner */}
