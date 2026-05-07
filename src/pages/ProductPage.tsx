@@ -6,6 +6,7 @@ import ServiceclickNav from "@/components/ServiceclickNav";
 import ServiceclickFooter from "@/components/ServiceclickFooter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
+import { useVisibleStores } from "@/hooks/useVisibleStores";
 
 const API_URL = "https://functions.poehali.dev/c7265605-961b-48cb-9594-4caad2cb333e";
 
@@ -100,6 +101,7 @@ export default function ProductPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToCart, items } = useCart();
+  const visibleStoreIds = useVisibleStores();
   const [adding, setAdding] = useState(false);
   const inCart = items.some((i) => i.product_id === String(id));
   const [product, setProduct] = useState<Product | null>(null);
@@ -293,17 +295,24 @@ export default function ProductPage() {
                   </div>
 
                   {/* Stock by store */}
-                  <div className="flex flex-col gap-1.5 mt-1 bg-[#f8f8f8] rounded-xl p-3">
-                    {product.stock_by_store.map((s) => (
-                      <div key={s.store_id} className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.quantity > 0 ? "bg-green-500" : "bg-gray-300"}`} />
-                        <span className="text-sm text-gray-600">{s.store_name}</span>
-                        <span className={`text-sm font-medium ml-auto ${s.quantity > 0 ? "text-green-600" : "text-gray-400"}`}>
-                          {s.quantity > 0 ? `${s.quantity} ${product.unit || "шт"}` : "Нет"}
-                        </span>
+                  {(() => {
+                    const filteredStock = visibleStoreIds && visibleStoreIds.length > 0
+                      ? product.stock_by_store.filter(s => visibleStoreIds.includes(s.store_id))
+                      : product.stock_by_store;
+                    return filteredStock.length > 0 ? (
+                      <div className="flex flex-col gap-1.5 mt-1 bg-[#f8f8f8] rounded-xl p-3">
+                        {filteredStock.map((s) => (
+                          <div key={s.store_id} className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.quantity > 0 ? "bg-green-500" : "bg-gray-300"}`} />
+                            <span className="text-sm text-gray-600">{s.store_name}</span>
+                            <span className={`text-sm font-medium ml-auto ${s.quantity > 0 ? "text-green-600" : "text-gray-400"}`}>
+                              {s.quantity > 0 ? `${s.quantity} ${product.unit || "шт"}` : "Нет"}
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    ) : null;
+                  })()}
 
                   <button
                     className={`mt-2 w-full text-base font-semibold py-3.5 rounded-xl transition-all ${

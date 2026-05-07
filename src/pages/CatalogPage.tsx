@@ -6,6 +6,7 @@ import ServiceclickFooter from "@/components/ServiceclickFooter";
 import Icon from "@/components/ui/icon";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
+import { useVisibleStores } from "@/hooks/useVisibleStores";
 
 const API_URL = "https://functions.poehali.dev/c7265605-961b-48cb-9594-4caad2cb333e";
 const PER_PAGE = 24;
@@ -44,12 +45,18 @@ interface Category {
   count: number;
 }
 
-function ProductCard({ product }: { product: Product }) {
+function ProductCard({ product, visibleStoreIds }: { product: Product; visibleStoreIds: number[] | null }) {
   const { user } = useAuth();
   const { addToCart, items } = useCart();
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
   const inCart = items.some((i) => i.product_id === String(product.id));
+
+  // Фильтруем склады по настройкам видимости
+  const filteredStock = visibleStoreIds && visibleStoreIds.length > 0
+    ? product.stock_by_store?.filter(s => visibleStoreIds.includes(s.store_id))
+    : product.stock_by_store;
+  const isInStock = filteredStock?.some(s => s.quantity > 0) ?? false;
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -87,16 +94,16 @@ function ProductCard({ product }: { product: Product }) {
             -{discount}%
           </span>
         )}
-        {!product.in_stock && (
+        {!isInStock && (
           <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
             <span className="text-xs text-gray-500 font-medium bg-white px-2 py-1 rounded-lg border border-gray-200">
               Нет в наличии
             </span>
           </div>
         )}
-        {product.in_stock && product.stock_by_store?.length > 0 && (
+        {isInStock && filteredStock && filteredStock.length > 0 && (
           <div className="absolute top-2 right-2 flex flex-col gap-0.5 items-end">
-            {product.stock_by_store.filter(s => s.quantity > 0).map(s => (
+            {filteredStock.filter(s => s.quantity > 0).map(s => (
               <span key={s.store_id} className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium leading-tight">
                 {s.store_name.replace("Торговый склад ", "").replace("Сервисный склад", "Сервис")}: {s.quantity} {product.unit || "шт"}
               </span>
@@ -158,6 +165,7 @@ function SkeletonCard() {
 
 export default function CatalogPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const visibleStoreIds = useVisibleStores();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -360,7 +368,7 @@ export default function CatalogPage() {
         ) : products.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
             {products.map((p) => (
-              <ProductCard key={p.id} product={p} />
+              <ProductCard key={p.id} product={p} visibleStoreIds={visibleStoreIds} />
             ))}
           </div>
         ) : !error ? (

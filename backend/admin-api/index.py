@@ -20,7 +20,10 @@ CORS_HEADERS = {
 }
 
 PROMASTER_API_URL = "https://functions.poehali.dev/c7265605-961b-48cb-9594-4caad2cb333e"
-VERSION = "1.1"
+VERSION = "1.2"
+
+import urllib.request
+import urllib.error
 
 
 def get_db():
@@ -333,6 +336,45 @@ def handle_settings(method, body):
     return err('Метод не поддерживается', 405)
 
 
+# --- PROMASTER STORES ---
+def handle_promaster_stores():
+    """Возвращает список складов из ProMaster API"""
+    token = os.environ.get('PROMASTER_API_TOKEN', '')
+    base_url = "https://pm-71723.promaster.app"
+    req = urllib.request.Request(
+        f"{base_url}/api/v1/store/getStores?limit=100",
+        headers={'Authorization': token}
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        data = json.loads(resp.read().decode('utf-8'))
+    stores = [{'id': s.get('id'), 'name': s.get('name', ''), 'main': s.get('main', False)} for s in (data.get('items') or [])]
+    return ok({'items': stores})
+
+
+# --- SHOP WAREHOUSES (выбранные склады для магазина) ---
+def handle_shop_warehouses(method, body):
+    conn = get_db()
+    cur = conn.cursor()
+    if method == 'GET':
+        cur.execute("SELECT value FROM shop_settings WHERE key = 'visible_store_ids'")
+        row = cur.fetchone()
+        conn.close()
+        ids = json.loads(row[0]) if row and row[0] else []
+        return ok({'store_ids': ids})
+    if method == 'POST':
+        store_ids = body.get('store_ids', [])
+        value = json.dumps(store_ids)
+        cur.execute(
+            "INSERT INTO shop_settings (key, value, label, group_name) VALUES ('visible_store_ids', %s, 'Видимые склады', 'warehouses') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()",
+            (value,)
+        )
+        conn.commit()
+        conn.close()
+        return ok({'ok': True})
+    conn.close()
+    return ok({'store_ids': []})
+
+
 # --- ORDERS ---
 def handle_orders(method, body, params):
     conn = get_db()
@@ -389,6 +431,8 @@ def handler(event: dict, context) -> dict:
         return handle_login(body)
     if action == 'banners' and method == 'GET':
         return handle_banners('GET', {}, params)
+    if action == 'shop_warehouses' and method == 'GET':
+        return handle_shop_warehouses('GET', {})
 
     # Защищённые маршруты
     user = verify_token(headers)
@@ -411,5 +455,9 @@ def handler(event: dict, context) -> dict:
         return handle_settings(method, body)
     if action == 'orders':
         return handle_orders(method, body, params)
+    if action == 'promaster_stores':
+        return handle_promaster_stores()
+    if action == 'shop_warehouses':
+        return handle_shop_warehouses(method, body)
 
     return err('Неизвестный action', 404)
