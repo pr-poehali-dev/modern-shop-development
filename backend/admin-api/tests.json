@@ -1,0 +1,28 @@
+{
+  "tests": [
+    {
+      "name": "Login with wrong credentials",
+      "method": "POST",
+      "path": "/?action=login",
+      "body": {"email": "wrong@wrong.com", "password": "wrong"},
+      "expectedStatus": 401,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Access protected route without token",
+      "method": "GET",
+      "path": "/?action=users",
+      "expectedStatus": 401,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Login with admin credentials",
+      "method": "POST",
+      "path": "/?action=login",
+      "body": {"email": "admin@admin.com", "password": "admin123"},
+      "expectedStatus": 200,
+      "expectedBody": {"token": "string"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}
