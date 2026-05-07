@@ -9,6 +9,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useLocationStores } from "@/hooks/useVisibleStores";
 
 const API_URL = "https://functions.poehali.dev/c7265605-961b-48cb-9594-4caad2cb333e";
+const USER_API_URL = "https://functions.poehali.dev/ef02c3ce-d482-422a-9426-60d8f91b4b86";
 const PER_PAGE = 24;
 
 
@@ -48,6 +49,45 @@ interface Category {
 }
 
 function OrderModal({ product, onClose }: { product: Product; onClose: () => void }) {
+  const { user, token } = useAuth();
+  const [name, setName] = useState(user?.name || "");
+  const [phone, setPhone] = useState(user?.phone || "");
+  const [quantity, setQuantity] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (!name.trim()) { setError("Введите имя"); return; }
+    if (!phone.trim()) { setError("Введите телефон"); return; }
+    setLoading(true);
+    try {
+      const res = await fetch(USER_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Auth-Token": token || "" },
+        body: JSON.stringify({
+          action: "request.create",
+          customer_name: name.trim(),
+          customer_phone: phone.trim(),
+          product_id: String(product.id),
+          product_name: product.name,
+          product_sku: product.sku,
+          product_price: product.price,
+          quantity,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) { setError(data.error); return; }
+      setSuccess(true);
+    } catch {
+      setError("Ошибка соединения");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
@@ -57,27 +97,70 @@ function OrderModal({ product, onClose }: { product: Product; onClose: () => voi
             <Icon name="X" size={20} />
           </button>
         </div>
-        <p className="text-sm text-gray-600 leading-relaxed mb-5">
-          Если товара нет в наличии в нашем интернет каталоге, он может быть на основном складе. Укажите ваши контактные данные и нужное количество. Наш менеджер уточнит наличие и вам перезвонит.
-        </p>
-        <div className="bg-gray-50 rounded-xl p-3 flex gap-3 items-center mb-5">
-          {product.image && (
-            <img src={product.image} alt={product.name} className="w-14 h-14 object-cover rounded-lg flex-shrink-0" />
-          )}
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-800 line-clamp-2">{product.name}</p>
-            {product.sku && <p className="text-xs text-gray-400 mt-0.5">Арт. {product.sku}</p>}
-            <p className="text-sm font-bold text-gray-900 mt-1">
-              {product.price > 0 ? product.price.toLocaleString("ru") + " ₽" : "Цена по запросу"}
-            </p>
+
+        {success ? (
+          <div className="text-center py-6">
+            <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Icon name="CheckCircle" size={28} className="text-green-500" />
+            </div>
+            <p className="font-semibold text-gray-900 mb-1">Заявка принята!</p>
+            <p className="text-sm text-gray-500">Менеджер свяжется с вами в ближайшее время.</p>
+            <button onClick={onClose} className="mt-5 px-6 py-2 bg-[#e31e24] text-white text-sm rounded-xl hover:bg-[#c41920] transition-colors">
+              Закрыть
+            </button>
           </div>
-        </div>
-        <button
-          disabled
-          className="w-full py-2.5 rounded-xl bg-gray-200 text-gray-400 text-sm font-medium cursor-not-allowed"
-        >
-          Заказать
-        </button>
+        ) : (
+          <>
+            <p className="text-sm text-gray-600 leading-relaxed mb-4">
+              Если товара нет в наличии в нашем интернет каталоге, он может быть на основном складе. Укажите ваши контактные данные и нужное количество. Наш менеджер уточнит наличие и вам перезвонит.
+            </p>
+            <div className="bg-gray-50 rounded-xl p-3 flex gap-3 items-center mb-4">
+              {product.image && (
+                <img src={product.image} alt={product.name} className="w-14 h-14 object-cover rounded-lg flex-shrink-0" />
+              )}
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-800 line-clamp-2">{product.name}</p>
+                {product.sku && <p className="text-xs text-gray-400 mt-0.5">Арт. {product.sku}</p>}
+                <p className="text-sm font-bold text-gray-900 mt-1">
+                  {product.price > 0 ? product.price.toLocaleString("ru") + " ₽" : "Цена по запросу"}
+                </p>
+              </div>
+            </div>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+              <input
+                type="text"
+                placeholder="Ваше имя"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                className="w-full px-3 py-2.5 text-sm border border-[#e8e8e8] rounded-xl focus:outline-none focus:border-[#e31e24]"
+              />
+              <input
+                type="tel"
+                placeholder="Телефон"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                className="w-full px-3 py-2.5 text-sm border border-[#e8e8e8] rounded-xl focus:outline-none focus:border-[#e31e24]"
+              />
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600 flex-shrink-0">Количество:</span>
+                <div className="flex items-center gap-1 border border-[#e8e8e8] rounded-xl overflow-hidden">
+                  <button type="button" onClick={() => setQuantity(q => Math.max(1, q - 1))} className="px-3 py-2 text-gray-500 hover:bg-gray-50 text-sm">−</button>
+                  <span className="px-3 text-sm font-medium text-gray-800 min-w-[2rem] text-center">{quantity}</span>
+                  <button type="button" onClick={() => setQuantity(q => q + 1)} className="px-3 py-2 text-gray-500 hover:bg-gray-50 text-sm">+</button>
+                </div>
+                <span className="text-sm text-gray-400">{product.unit || "шт"}</span>
+              </div>
+              {error && <p className="text-xs text-red-500">{error}</p>}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-2.5 rounded-xl bg-[#e31e24] hover:bg-[#c41920] text-white text-sm font-medium transition-colors disabled:opacity-60"
+              >
+                {loading ? "Отправляю..." : "Заказать"}
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );

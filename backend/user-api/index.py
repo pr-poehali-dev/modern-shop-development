@@ -338,6 +338,36 @@ def handle_order_create(conn, user_id: int, body: dict) -> dict:
                'total_price': total_price, 'items_count': len(items)})
 
 
+def handle_request_create(conn, user_id: int, body: dict) -> dict:
+    customer_name = str(body.get('customer_name', '') or '').strip()
+    customer_phone = str(body.get('customer_phone', '') or '').strip()
+    product_id = str(body.get('product_id', '') or '').strip()
+    product_name = str(body.get('product_name', '') or '').strip()
+    product_sku = str(body.get('product_sku', '') or '').strip()
+    product_price = body.get('product_price', 0) or 0
+    quantity = int(body.get('quantity', 1) or 1)
+    comment = str(body.get('comment', '') or '').strip()
+
+    if not customer_name:
+        return err('Введите имя')
+    if not customer_phone:
+        return err('Введите телефон')
+    if not product_name:
+        return err('Не указан товар')
+
+    cur = conn.cursor()
+    cur.execute(
+        f"INSERT INTO t_p9295853_modern_shop_developm.product_requests "
+        f"(user_id, product_id, product_name, product_sku, product_price, quantity, customer_name, customer_phone, comment, status) "
+        f"VALUES ({user_id if user_id else 'NULL'}, '{escape(product_id)}', '{escape(product_name)}', "
+        f"'{escape(product_sku)}', {float(product_price)}, {quantity}, '{escape(customer_name)}', "
+        f"'{escape(customer_phone)}', '{escape(comment)}', 'new') RETURNING id"
+    )
+    request_id = cur.fetchone()[0]
+    conn.commit()
+    return ok({'ok': True, 'request_id': request_id})
+
+
 def handle_order_list(conn, user_id: int) -> dict:
     cur = conn.cursor()
     cur.execute(
@@ -393,6 +423,8 @@ def handler(event: dict, context) -> dict:
             return handle_order_create(conn, user_id, body)
         if action == 'order.list':
             return handle_order_list(conn, user_id)
+        if action == 'request.create':
+            return handle_request_create(conn, user_id, body)
 
         return err(f'Неизвестный action: {action}')
     finally:
