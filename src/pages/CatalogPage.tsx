@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import ServiceclickHeader from "@/components/ServiceclickHeader";
 import ServiceclickNav from "@/components/ServiceclickNav";
 import ServiceclickFooter from "@/components/ServiceclickFooter";
 import Icon from "@/components/ui/icon";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCart } from "@/contexts/CartContext";
 
 const API_URL = "https://functions.poehali.dev/c7265605-961b-48cb-9594-4caad2cb333e";
 const PER_PAGE = 24;
@@ -43,6 +45,26 @@ interface Category {
 }
 
 function ProductCard({ product }: { product: Product }) {
+  const { user } = useAuth();
+  const { addToCart, items } = useCart();
+  const navigate = useNavigate();
+  const [adding, setAdding] = useState(false);
+  const inCart = items.some((i) => i.product_id === String(product.id));
+
+  const handleAddToCart = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!user) { navigate("/login", { state: { from: "/catalog" } }); return; }
+    setAdding(true);
+    try {
+      await addToCart({
+        id: product.id, name: product.name, price: product.price,
+        image: product.image, sku: product.sku, unit: product.unit,
+      });
+    } finally {
+      setAdding(false);
+    }
+  };
+
   const discount =
     product.old_price && product.old_price > product.price
       ? Math.round((1 - product.price / product.old_price) * 100)
@@ -104,10 +126,15 @@ function ProductCard({ product }: { product: Product }) {
           )}
         </div>
         <button
-          className="mt-2 w-full bg-[#e31e24] hover:bg-[#c41920] text-white text-sm font-medium py-2 rounded-xl transition-colors"
-          onClick={(e) => e.preventDefault()}
+          className={`mt-2 w-full text-sm font-medium py-2 rounded-xl transition-colors ${
+            inCart
+              ? "bg-green-500 hover:bg-green-600 text-white"
+              : "bg-[#e31e24] hover:bg-[#c41920] text-white"
+          }`}
+          onClick={handleAddToCart}
+          disabled={adding}
         >
-          В корзину
+          {adding ? "Добавляю..." : inCart ? "В корзине ✓" : "В корзину"}
         </button>
       </div>
     </a>

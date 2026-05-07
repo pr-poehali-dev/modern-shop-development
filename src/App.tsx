@@ -7,6 +7,10 @@ import Index from "./pages/Index";
 import ProductPage from "./pages/ProductPage";
 import CatalogPage from "./pages/CatalogPage";
 import NotFound from "./pages/NotFound";
+import LoginPage from "./pages/LoginPage";
+import CartPage from "./pages/CartPage";
+import CheckoutPage from "./pages/CheckoutPage";
+import OrderSuccessPage from "./pages/OrderSuccessPage";
 import AdminLoginPage from "./pages/admin/AdminLoginPage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminOrdersPage from "./pages/admin/AdminOrdersPage";
@@ -18,6 +22,8 @@ import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
 import AdminLayout from "./admin/AdminLayout";
 import { AdminAuthProvider } from "./admin/AdminAuth";
+import { AuthProvider } from "./contexts/AuthContext";
+import { CartProvider } from "./contexts/CartContext";
 
 const queryClient = new QueryClient();
 
@@ -27,10 +33,16 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <AuthProvider>
+          <CartProvider>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/product/:id" element={<ProductPage />} />
           <Route path="/catalog" element={<CatalogPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/cart" element={<CartPage />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/order-success" element={<OrderSuccessPage />} />
 
           <Route path="/admin/login" element={
             <AdminAuthProvider>
@@ -81,6 +93,8 @@ const App = () => (
 
           <Route path="*" element={<NotFound />} />
         </Routes>
+          </CartProvider>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

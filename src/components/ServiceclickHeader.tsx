@@ -1,9 +1,19 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCart } from "@/contexts/CartContext";
 
 export default function ServiceclickHeader() {
-  const [cartCount] = useState(3);
+  const { user, logout } = useAuth();
+  const { count } = useCart();
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (query.trim()) navigate(`/catalog?search=${encodeURIComponent(query.trim())}`);
+  };
 
   return (
     <header className="bg-[#e31e24] text-white">
@@ -16,9 +26,16 @@ export default function ServiceclickHeader() {
             <a href="#" className="hover:underline opacity-90">Корпоративным клиентам</a>
             <a href="#" className="hover:underline opacity-90">Сервисный центр</a>
           </div>
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
             <a href="#" className="hover:underline opacity-90">Москва</a>
-            <a href="#" className="hover:underline opacity-90">Войти</a>
+            {user ? (
+              <span className="opacity-90">
+                {user.name} ·{" "}
+                <button onClick={logout} className="hover:underline">Выйти</button>
+              </span>
+            ) : (
+              <a href="/login" className="hover:underline opacity-90">Войти</a>
+            )}
           </div>
         </div>
       </div>
@@ -33,13 +50,13 @@ export default function ServiceclickHeader() {
         </a>
 
         {/* Catalog button */}
-        <button className="flex items-center gap-2 bg-white text-[#e31e24] font-semibold px-4 py-2 rounded text-sm flex-shrink-0 hover:bg-gray-100 transition-colors">
+        <a href="/catalog" className="flex items-center gap-2 bg-white text-[#e31e24] font-semibold px-4 py-2 rounded text-sm flex-shrink-0 hover:bg-gray-100 transition-colors">
           <Icon name="LayoutGrid" size={16} />
           Каталог
-        </button>
+        </a>
 
         {/* Search */}
-        <div className="flex-1 relative">
+        <form onSubmit={handleSearch} className="flex-1 relative">
           <input
             type="text"
             value={query}
@@ -47,10 +64,10 @@ export default function ServiceclickHeader() {
             placeholder="Поиск по сайту"
             className="w-full h-10 pl-4 pr-12 rounded text-gray-900 text-sm outline-none border-0"
           />
-          <button className="absolute right-0 top-0 h-10 w-10 bg-[#c41920] rounded-r flex items-center justify-center hover:bg-[#a51217] transition-colors">
+          <button type="submit" className="absolute right-0 top-0 h-10 w-10 bg-[#c41920] rounded-r flex items-center justify-center hover:bg-[#a51217] transition-colors">
             <Icon name="Search" size={18} className="text-white" />
           </button>
-        </div>
+        </form>
 
         {/* Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -62,21 +79,28 @@ export default function ServiceclickHeader() {
             <Icon name="Heart" size={20} />
             <span className="text-xs">Избранное</span>
           </button>
-          <button className="flex flex-col items-center gap-0.5 px-3 py-1 hover:bg-[#c41920] rounded transition-colors text-white">
+          <a
+            href={user ? "#" : "/login"}
+            onClick={user ? (e) => { e.preventDefault(); } : undefined}
+            className="flex flex-col items-center gap-0.5 px-3 py-1 hover:bg-[#c41920] rounded transition-colors text-white"
+          >
             <Icon name="User" size={20} />
-            <span className="text-xs">Войти</span>
-          </button>
-          <button className="flex flex-col items-center gap-0.5 px-3 py-1 hover:bg-[#c41920] rounded transition-colors text-white relative">
+            <span className="text-xs">{user ? user.name.split(" ")[0] : "Войти"}</span>
+          </a>
+          <a
+            href="/cart"
+            className="flex flex-col items-center gap-0.5 px-3 py-1 hover:bg-[#c41920] rounded transition-colors text-white relative"
+          >
             <div className="relative">
               <Icon name="ShoppingCart" size={20} />
-              {cartCount > 0 && (
+              {count > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 bg-white text-[#e31e24] text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                  {cartCount}
+                  {count > 99 ? "99+" : count}
                 </span>
               )}
             </div>
             <span className="text-xs">Корзина</span>
-          </button>
+          </a>
         </div>
       </div>
     </header>

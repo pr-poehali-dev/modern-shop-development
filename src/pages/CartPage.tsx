@@ -1,0 +1,164 @@
+import ServiceclickHeader from "@/components/ServiceclickHeader";
+import ServiceclickNav from "@/components/ServiceclickNav";
+import ServiceclickFooter from "@/components/ServiceclickFooter";
+import Icon from "@/components/ui/icon";
+import { useCart } from "@/contexts/CartContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+
+export default function CartPage() {
+  const { user } = useAuth();
+  const { items, count, total, loading, updateQuantity, removeItem, clearCart } = useCart();
+  const navigate = useNavigate();
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex flex-col bg-[#f5f5f5]">
+        <ServiceclickHeader />
+        <ServiceclickNav />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center flex flex-col items-center gap-4 p-8">
+            <Icon name="ShoppingCart" size={48} className="text-gray-300" />
+            <p className="text-gray-500">Войдите, чтобы увидеть корзину</p>
+            <button
+              onClick={() => navigate("/login", { state: { from: "/cart" } })}
+              className="bg-[#e31e24] text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-[#c41920] transition-colors"
+            >
+              Войти
+            </button>
+          </div>
+        </main>
+        <ServiceclickFooter />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col bg-[#f5f5f5]">
+      <ServiceclickHeader />
+      <ServiceclickNav />
+
+      <main className="flex-1">
+        <div className="max-w-[1200px] mx-auto px-4 py-6">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-4">
+            <a href="/" className="hover:text-[#e31e24]">Главная</a>
+            <Icon name="ChevronRight" size={14} />
+            <span className="text-gray-800 font-medium">Корзина</span>
+          </div>
+
+          <h1 className="text-2xl font-bold text-gray-900 mb-6">
+            Корзина {count > 0 && <span className="text-gray-400 font-normal text-lg">({count} {count === 1 ? "товар" : count < 5 ? "товара" : "товаров"})</span>}
+          </h1>
+
+          {loading && (
+            <div className="flex justify-center py-12">
+              <div className="w-10 h-10 rounded-full border-4 border-red-100 border-t-[#e31e24] animate-spin" />
+            </div>
+          )}
+
+          {!loading && items.length === 0 && (
+            <div className="bg-white rounded-2xl p-12 flex flex-col items-center gap-4 text-center">
+              <Icon name="ShoppingCart" size={48} className="text-gray-300" />
+              <p className="text-gray-500 text-lg">Корзина пуста</p>
+              <a href="/catalog" className="bg-[#e31e24] text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-[#c41920] transition-colors">
+                Перейти в каталог
+              </a>
+            </div>
+          )}
+
+          {!loading && items.length > 0 && (
+            <div className="flex gap-6 flex-col lg:flex-row">
+              {/* Items */}
+              <div className="flex-1 flex flex-col gap-3">
+                {items.map((item) => (
+                  <div key={item.id} className="bg-white rounded-2xl p-4 flex gap-4 items-center">
+                    <a href={`/product/${item.product_id}`} className="w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden bg-[#f8f8f8]">
+                      <img
+                        src={item.product_image || `https://picsum.photos/seed/${item.product_id}/80/80`}
+                        alt={item.product_name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${item.product_id}/80/80`; }}
+                      />
+                    </a>
+                    <div className="flex-1 min-w-0">
+                      <a href={`/product/${item.product_id}`} className="text-sm font-medium text-gray-800 line-clamp-2 hover:text-[#e31e24] transition-colors">
+                        {item.product_name}
+                      </a>
+                      {item.product_sku && (
+                        <p className="text-xs text-gray-400 mt-0.5">Арт. {item.product_sku}</p>
+                      )}
+                      <p className="text-base font-bold text-gray-900 mt-1">
+                        {(item.product_price * item.quantity).toLocaleString("ru")} ₽
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
+                        className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:border-[#e31e24] hover:text-[#e31e24] transition-colors"
+                      >
+                        <Icon name="Minus" size={14} />
+                      </button>
+                      <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                      <button
+                        onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
+                        className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:border-[#e31e24] hover:text-[#e31e24] transition-colors"
+                      >
+                        <Icon name="Plus" size={14} />
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => removeItem(item.product_id)}
+                      className="ml-2 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
+                    >
+                      <Icon name="X" size={18} />
+                    </button>
+                  </div>
+                ))}
+
+                <button
+                  onClick={() => clearCart()}
+                  className="text-sm text-gray-400 hover:text-red-500 transition-colors self-start mt-1"
+                >
+                  Очистить корзину
+                </button>
+              </div>
+
+              {/* Summary */}
+              <div className="lg:w-80 flex-shrink-0">
+                <div className="bg-white rounded-2xl p-5 sticky top-4">
+                  <h2 className="text-lg font-bold text-gray-900 mb-4">Итого</h2>
+                  <div className="flex justify-between text-sm text-gray-600 mb-2">
+                    <span>Товары ({count} шт)</span>
+                    <span>{total.toLocaleString("ru")} ₽</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-600 mb-4">
+                    <span>Доставка</span>
+                    <span className="text-green-600">Бесплатно от 1 000 ₽</span>
+                  </div>
+                  <div className="border-t border-gray-100 pt-4 mb-4">
+                    <div className="flex justify-between font-bold text-lg text-gray-900">
+                      <span>Сумма</span>
+                      <span>{total.toLocaleString("ru")} ₽</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => navigate("/checkout")}
+                    className="w-full bg-[#e31e24] hover:bg-[#c41920] text-white font-semibold py-3 rounded-xl transition-colors"
+                  >
+                    Оформить заказ
+                  </button>
+                  <a href="/catalog" className="block text-center text-sm text-gray-400 hover:text-[#e31e24] mt-3 transition-colors">
+                    Продолжить покупки
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+
+      <ServiceclickFooter />
+    </div>
+  );
+}

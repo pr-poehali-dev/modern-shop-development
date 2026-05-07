@@ -4,6 +4,8 @@ import Icon from "@/components/ui/icon";
 import ServiceclickHeader from "@/components/ServiceclickHeader";
 import ServiceclickNav from "@/components/ServiceclickNav";
 import ServiceclickFooter from "@/components/ServiceclickFooter";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCart } from "@/contexts/CartContext";
 
 const API_URL = "https://functions.poehali.dev/c7265605-961b-48cb-9594-4caad2cb333e";
 
@@ -32,6 +34,10 @@ interface Product {
 export default function ProductPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { addToCart, items } = useCart();
+  const [adding, setAdding] = useState(false);
+  const inCart = items.some((i) => i.product_id === String(id));
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -238,8 +244,24 @@ export default function ProductPage() {
                       ))}
                     </div>
 
-                    <button className="mt-4 w-full bg-[#e31e24] hover:bg-[#c41920] text-white text-base font-semibold py-3 rounded-xl transition-colors">
-                      В корзину
+                    <button
+                      className={`mt-4 w-full text-base font-semibold py-3 rounded-xl transition-colors ${
+                        inCart ? "bg-green-500 hover:bg-green-600 text-white" : "bg-[#e31e24] hover:bg-[#c41920] text-white"
+                      }`}
+                      disabled={adding}
+                      onClick={async () => {
+                        if (!user) { navigate("/login", { state: { from: `/product/${id}` } }); return; }
+                        if (inCart) { navigate("/cart"); return; }
+                        setAdding(true);
+                        try {
+                          await addToCart({
+                            id: product.id, name: product.name, price: product.price,
+                            image: product.image, sku: product.sku, unit: product.unit,
+                          });
+                        } finally { setAdding(false); }
+                      }}
+                    >
+                      {adding ? "Добавляю..." : inCart ? "Перейти в корзину →" : "В корзину"}
                     </button>
 
                     {product.description && (
