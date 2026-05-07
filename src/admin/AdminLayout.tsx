@@ -33,14 +33,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     exact ? location.pathname === path : location.pathname.startsWith(path);
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
+    <div className="h-screen flex overflow-hidden bg-gray-50">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-20 bg-black/40 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed lg:static z-30 top-0 left-0 h-full w-60 bg-[#1a1a2e] flex flex-col transition-transform duration-200 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
+      <aside className={`fixed lg:static z-30 top-0 left-0 h-full w-60 bg-[#1a1a2e] flex flex-col flex-shrink-0 transition-transform duration-200 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
         <div className="px-5 py-4 border-b border-white/10">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-[#e31e24] rounded-lg flex items-center justify-center">
@@ -92,9 +92,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
+      <div className="flex-1 flex flex-col min-w-0 h-full">
         {/* Topbar */}
-        <header className="h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-3 sticky top-0 z-10">
+        <header className="h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-3 flex-shrink-0">
           <button className="lg:hidden" onClick={() => setSidebarOpen(true)}>
             <Icon name="Menu" size={20} className="text-gray-600" />
           </button>
@@ -106,7 +106,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </header>
 
         {/* Content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 overflow-y-auto p-6">
           {children}
         </main>
       </div>
