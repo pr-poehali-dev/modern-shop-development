@@ -213,14 +213,23 @@ export default function AdminBannersPage() {
     toast.success(b.is_active ? "Баннер скрыт" : "Баннер включён");
   };
 
-  const deleteBanner = async (b: Banner) => {
-    await fetch(`${ADMIN_API_URL}?action=banners`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json", "X-Admin-Token": token! },
-      body: JSON.stringify({ id: b.id }),
+  const deleteBanner = (b: Banner) => {
+    toast("Удалить баннер?", {
+      description: `«${b.title || "Без заголовка"}» будет скрыт с сайта`,
+      action: {
+        label: "Удалить",
+        onClick: async () => {
+          await fetch(`${ADMIN_API_URL}?action=banners`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json", "X-Admin-Token": token! },
+            body: JSON.stringify({ id: b.id }),
+          });
+          load();
+          toast.error("Баннер удалён");
+        },
+      },
+      cancel: { label: "Отмена", onClick: () => {} },
     });
-    load();
-    toast.error("Баннер удалён");
   };
 
   // Drag-and-drop для сортировки
