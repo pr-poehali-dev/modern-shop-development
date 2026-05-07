@@ -313,10 +313,12 @@ export default function CatalogPage() {
   const visibleStoreIds = useLocationStores();
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [allInStockProducts, setAllInStockProducts] = useState<Product[] | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [inStockLoading, setInStockLoading] = useState(false);
   const [catLoading, setCatLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -324,7 +326,18 @@ export default function CatalogPage() {
   const categoryId = searchParams.get("category") || "";
   const search = searchParams.get("search") || "";
   const storeId = searchParams.get("store") || "";
+  const inStockOnly = searchParams.get("in_stock") === "1";
   const [searchInput, setSearchInput] = useState(search);
+
+  // Страница внутри отфильтрованного списка "в наличии"
+  const [inStockPage, setInStockPage] = useState(1);
+
+  const isInStockForLocation = useCallback((product: Product) => {
+    const filtered = visibleStoreIds && visibleStoreIds.length > 0
+      ? product.stock_by_store?.filter(s => visibleStoreIds.includes(s.store_id))
+      : product.stock_by_store;
+    return filtered?.some(s => s.quantity > 0) ?? false;
+  }, [visibleStoreIds]);
 
   const totalPages = Math.ceil(total / PER_PAGE);
 
@@ -358,14 +371,8 @@ export default function CatalogPage() {
       } else {
         const items: Product[] = data.items || [];
         items.sort((a, b) => {
-          const aFiltered = visibleStoreIds && visibleStoreIds.length > 0
-            ? a.stock_by_store?.filter(s => visibleStoreIds.includes(s.store_id))
-            : a.stock_by_store;
-          const bFiltered = visibleStoreIds && visibleStoreIds.length > 0
-            ? b.stock_by_store?.filter(s => visibleStoreIds.includes(s.store_id))
-            : b.stock_by_store;
-          const aInStock = aFiltered?.some(s => s.quantity > 0) ? 1 : 0;
-          const bInStock = bFiltered?.some(s => s.quantity > 0) ? 1 : 0;
+          const aInStock = isInStockForLocation(a) ? 1 : 0;
+          const bInStock = isInStockForLocation(b) ? 1 : 0;
           return bInStock - aInStock;
         });
         setProducts(items);
@@ -378,15 +385,86 @@ export default function CatalogPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, categoryId, search, storeId, visibleStoreIds]);
+  }, [page, categoryId, search, storeId, isInStockForLocation]);
+
+  // Загружает ВСЕ товары постранично и фильтрует только "в наличии"
+  const loadAllInStock = useCallback(async () => {
+    setInStockLoading(true);
+    setError("");
+    try {
+      const firstUrl = `${API_URL}?action=products&page=1&per_page=100` +
+        (categoryId ? `&category_id=${categoryId}` : "") +
+        (search ? `&search=${encodeURIComponent(search)}` : "") +
+        (storeId ? `&store_id=${storeId}` : "");
+      const firstRes = await fetch(firstUrl);
+      const firstData = await firstRes.json();
+      if (firstData.error) { setError(firstData.error); setInStockLoading(false); return; }
+
+      const serverTotal: number = firstData.total || 0;
+      const totalApiPages = Math.ceil(serverTotal / 100);
+      let all: Product[] = [...(firstData.items || [])];
+
+      // Грузим остальные страницы параллельно
+      if (totalApiPages > 1) {
+        const rest = await Promise.all(
+          Array.from({ length: totalApiPages - 1 }, (_, i) => {
+            const u = `${API_URL}?action=products&page=${i + 2}&per_page=100` +
+              (categoryId ? `&category_id=${categoryId}` : "") +
+              (search ? `&search=${encodeURIComponent(search)}` : "") +
+              (storeId ? `&store_id=${storeId}` : "");
+            return fetch(u).then(r => r.json());
+          })
+        );
+        rest.forEach(d => { if (d.items) all = all.concat(d.items); });
+      }
+
+      const filtered = all.filter(p => isInStockForLocation(p));
+      setAllInStockProducts(filtered);
+      if (firstData.stores?.length) setStores(firstData.stores);
+    } catch (e: unknown) {
+      setError(String(e));
+      setAllInStockProducts([]);
+    } finally {
+      setInStockLoading(false);
+    }
+  }, [categoryId, search, storeId, isInStockForLocation]);
 
   useEffect(() => { loadCategories(); }, [loadCategories]);
-  useEffect(() => { loadProducts(); }, [loadProducts]);
+
+  useEffect(() => {
+    if (inStockOnly) {
+      setAllInStockProducts(null);
+      setInStockPage(1);
+      loadAllInStock();
+    } else {
+      loadProducts();
+    }
+  }, [inStockOnly, loadProducts, loadAllInStock]);
+
+  // При смене локации — перезагружаем
+  useEffect(() => {
+    if (inStockOnly) {
+      setAllInStockProducts(null);
+      setInStockPage(1);
+      loadAllInStock();
+    }
+  }, [visibleStoreIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setFilter = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams);
     if (value) next.set(key, value);
     else next.delete(key);
+    next.delete("page");
+    setSearchParams(next);
+  };
+
+  const toggleInStock = () => {
+    const next = new URLSearchParams(searchParams);
+    if (inStockOnly) {
+      next.delete("in_stock");
+    } else {
+      next.set("in_stock", "1");
+    }
     next.delete("page");
     setSearchParams(next);
   };
@@ -402,6 +480,22 @@ export default function CatalogPage() {
     setSearchParams(next);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  const goInStockPage = (p: number) => {
+    setInStockPage(p);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Данные для отображения
+  const isLoading = inStockOnly ? inStockLoading : loading;
+  const displayProducts = inStockOnly && allInStockProducts !== null
+    ? allInStockProducts.slice((inStockPage - 1) * PER_PAGE, inStockPage * PER_PAGE)
+    : products;
+  const displayTotal = inStockOnly && allInStockProducts !== null ? allInStockProducts.length : total;
+  const displayTotalPages = inStockOnly && allInStockProducts !== null
+    ? Math.ceil(allInStockProducts.length / PER_PAGE)
+    : totalPages;
+  const displayPage = inStockOnly ? inStockPage : page;
 
   const selectedCategory = categories.find((c) => String(c.id) === categoryId);
 
@@ -431,12 +525,12 @@ export default function CatalogPage() {
         </div>
 
         {/* Title + search */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
           <h1 className="text-2xl font-bold text-gray-900 flex-1">
             {selectedCategory ? selectedCategory.name : "Каталог товаров"}
-            {total > 0 && !loading && (
+            {displayTotal > 0 && !isLoading && (
               <span className="ml-2 text-base text-gray-400 font-normal">
-                {total.toLocaleString("ru")} товаров
+                {displayTotal.toLocaleString("ru")} товаров
               </span>
             )}
           </h1>
@@ -461,6 +555,28 @@ export default function CatalogPage() {
         </div>
 
 
+
+        {/* In-stock toggle button */}
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            onClick={toggleInStock}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
+              inStockOnly
+                ? "bg-green-600 text-white border-green-600 shadow-sm"
+                : "bg-white text-gray-600 border-[#e8e8e8] hover:border-green-500 hover:text-green-600"
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${inStockOnly ? "bg-white" : "bg-green-500"}`} />
+            В наличии
+            {inStockOnly && allInStockProducts !== null && (
+              <span className="ml-1 bg-white/25 rounded-lg px-1.5 py-0.5 text-xs">{allInStockProducts.length}</span>
+            )}
+            {inStockLoading && <span className="ml-1 w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin inline-block" />}
+          </button>
+          {inStockOnly && (
+            <span className="text-xs text-gray-400">Показаны только товары в наличии по вашей локации</span>
+          )}
+        </div>
 
         {/* Active search badge */}
         {search && (
@@ -488,54 +604,56 @@ export default function CatalogPage() {
         )}
 
         {/* Grid */}
-        {loading ? (
+        {isLoading ? (
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
             {Array.from({ length: PER_PAGE }).map((_, i) => (
               <SkeletonCard key={i} />
             ))}
           </div>
-        ) : products.length > 0 ? (
+        ) : displayProducts.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-            {products.map((p) => (
+            {displayProducts.map((p) => (
               <ProductCard key={p.id} product={p} visibleStoreIds={visibleStoreIds} />
             ))}
           </div>
         ) : !error ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-400">
             <Icon name="PackageSearch" size={48} className="mb-3" />
-            <p className="font-medium text-gray-600">Товары не найдены</p>
+            <p className="font-medium text-gray-600">
+              {inStockOnly ? "Нет товаров в наличии по вашей локации" : "Товары не найдены"}
+            </p>
             <p className="text-sm mt-1">Попробуйте изменить фильтры или поисковый запрос</p>
           </div>
         ) : null}
 
         {/* Pagination */}
-        {!loading && totalPages > 1 && (
+        {!isLoading && displayTotalPages > 1 && (
           <div className="flex items-center justify-center gap-1.5 mt-8">
             <button
-              onClick={() => goPage(page - 1)}
-              disabled={page <= 1}
+              onClick={() => inStockOnly ? goInStockPage(displayPage - 1) : goPage(displayPage - 1)}
+              disabled={displayPage <= 1}
               className="w-9 h-9 rounded-xl border border-[#e8e8e8] bg-white flex items-center justify-center text-gray-500 hover:border-[#e31e24] hover:text-[#e31e24] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <Icon name="ChevronLeft" size={16} />
             </button>
 
-            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+            {Array.from({ length: Math.min(displayTotalPages, 7) }, (_, i) => {
               let p: number;
-              if (totalPages <= 7) {
+              if (displayTotalPages <= 7) {
                 p = i + 1;
-              } else if (page <= 4) {
+              } else if (displayPage <= 4) {
                 p = i + 1;
-              } else if (page >= totalPages - 3) {
-                p = totalPages - 6 + i;
+              } else if (displayPage >= displayTotalPages - 3) {
+                p = displayTotalPages - 6 + i;
               } else {
-                p = page - 3 + i;
+                p = displayPage - 3 + i;
               }
               return (
                 <button
                   key={p}
-                  onClick={() => goPage(p)}
+                  onClick={() => inStockOnly ? goInStockPage(p) : goPage(p)}
                   className={`w-9 h-9 rounded-xl border text-sm font-medium transition-colors ${
-                    p === page
+                    p === displayPage
                       ? "bg-[#e31e24] text-white border-[#e31e24]"
                       : "bg-white border-[#e8e8e8] text-gray-700 hover:border-[#e31e24] hover:text-[#e31e24]"
                   }`}
@@ -546,8 +664,8 @@ export default function CatalogPage() {
             })}
 
             <button
-              onClick={() => goPage(page + 1)}
-              disabled={page >= totalPages}
+              onClick={() => inStockOnly ? goInStockPage(displayPage + 1) : goPage(displayPage + 1)}
+              disabled={displayPage >= displayTotalPages}
               className="w-9 h-9 rounded-xl border border-[#e8e8e8] bg-white flex items-center justify-center text-gray-500 hover:border-[#e31e24] hover:text-[#e31e24] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <Icon name="ChevronRight" size={16} />
