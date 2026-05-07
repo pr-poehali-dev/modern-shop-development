@@ -270,6 +270,77 @@ def handle_locations(method, body, params):
     return err('Метод не поддерживается', 405)
 
 
+# --- LOCATION STORES (привязка складов ProMaster к локациям) ---
+def handle_location_stores(method, body, params):
+    conn = get_db()
+    cur = conn.cursor()
+    if method == 'GET':
+        location_id = params.get('location_id')
+        if location_id:
+            cur.execute("SELECT store_id, store_name FROM location_stores WHERE location_id = %s", (location_id,))
+            rows = cur.fetchall()
+            conn.close()
+            return ok({'store_ids': [r[0] for r in rows], 'stores': [{'store_id': r[0], 'store_name': r[1]} for r in rows]})
+        # Все привязки — group by location
+        cur.execute("SELECT location_id, store_id, store_name FROM location_stores ORDER BY location_id")
+        rows = cur.fetchall()
+        conn.close()
+        result = {}
+        for r in rows:
+            lid = r[0]
+            if lid not in result:
+                result[lid] = []
+            result[lid].append({'store_id': r[1], 'store_name': r[2]})
+        return ok({'by_location': result})
+    if method == 'POST':
+        location_id = body.get('location_id')
+        store_ids = body.get('store_ids', [])
+        store_names = body.get('store_names', {})
+        if not location_id:
+            conn.close()
+            return err('location_id обязателен')
+        # Помечаем все существующие как неактивные (store_id = -abs(store_id))
+        cur.execute("SELECT id, store_id FROM location_stores WHERE location_id = %s AND store_id > 0", (location_id,))
+        existing = cur.fetchall()
+        existing_ids = {r[1]: r[0] for r in existing}
+        new_set = set(store_ids)
+        # Деактивируем убранные (отрицательный store_id)
+        for sid, row_id in existing_ids.items():
+            if sid not in new_set:
+                cur.execute("UPDATE location_stores SET store_id = %s WHERE id = %s", (-sid, row_id))
+        # Вставляем/обновляем активные
+        for sid in store_ids:
+            sname = store_names.get(str(sid), '')
+            cur.execute(
+                "INSERT INTO location_stores (location_id, store_id, store_name) VALUES (%s, %s, %s) ON CONFLICT (location_id, store_id) DO UPDATE SET store_name = EXCLUDED.store_name",
+                (location_id, sid, sname)
+            )
+        conn.commit()
+        conn.close()
+        return ok({'ok': True})
+    conn.close()
+    return ok({'store_ids': []})
+
+
+# --- LOCATIONS PUBLIC (для фронтенда магазина) ---
+def handle_locations_public():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT l.id, l.name, l.city FROM locations l WHERE l.is_active = TRUE ORDER BY l.sort_order, l.id")
+    locs = cur.fetchall()
+    cur.execute("SELECT location_id, store_id FROM location_stores WHERE store_id > 0")
+    bindings = cur.fetchall()
+    conn.close()
+    by_location = {}
+    for b in bindings:
+        lid = b[0]
+        if lid not in by_location:
+            by_location[lid] = []
+        by_location[lid].append(b[1])
+    items = [{'id': r[0], 'name': r[1], 'city': r[2], 'store_ids': by_location.get(r[0], [])} for r in locs]
+    return ok({'items': items})
+
+
 # --- WAREHOUSES ---
 def handle_warehouses(method, body, params):
     conn = get_db()
@@ -433,6 +504,8 @@ def handler(event: dict, context) -> dict:
         return handle_banners('GET', {}, params)
     if action == 'shop_warehouses' and method == 'GET':
         return handle_shop_warehouses('GET', {})
+    if action == 'locations_public' and method == 'GET':
+        return handle_locations_public()
 
     # Защищённые маршруты
     user = verify_token(headers)
@@ -459,5 +532,7 @@ def handler(event: dict, context) -> dict:
         return handle_promaster_stores()
     if action == 'shop_warehouses':
         return handle_shop_warehouses(method, body)
+    if action == 'location_stores':
+        return handle_location_stores(method, body, params)
 
     return err('Неизвестный action', 404)
