@@ -216,12 +216,26 @@ export default function ServiceclickHero() {
               ...getSlideStyle(i, current, prev, animating, direction, slide.effect),
             }}
           >
+            {/* Image — fullscreen background */}
+            {slide.image && (
+              <img
+                src={slide.image}
+                alt={slide.title}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            )}
+
+            {/* Overlay — only when image exists */}
+            {slide.image && (
+              <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-black/10 to-transparent" />
+            )}
+
             {/* Text */}
-            <div className="flex flex-col justify-center pl-10 pr-4 z-10 flex-1">
-              <h2 className="text-gray-900 text-2xl font-bold leading-tight mb-2 whitespace-pre-line">
+            <div className="relative flex flex-col justify-center pl-10 pr-4 z-10 max-w-[55%]">
+              <h2 className={`text-2xl font-bold leading-tight mb-2 whitespace-pre-line ${slide.image ? "text-white" : "text-gray-900"}`}>
                 {slide.title}
               </h2>
-              <p className="text-gray-600 text-sm mb-5 whitespace-pre-line leading-relaxed">
+              <p className={`text-sm mb-5 whitespace-pre-line leading-relaxed ${slide.image ? "text-white/80" : "text-gray-600"}`}>
                 {slide.subtitle}
               </p>
               {slide.button_text && (
@@ -239,17 +253,6 @@ export default function ServiceclickHero() {
                 </a>
               )}
             </div>
-
-            {/* Image */}
-            {slide.image && (
-              <div className="flex-1 h-full flex items-center justify-center overflow-hidden">
-                <img
-                  src={slide.image}
-                  alt={slide.title}
-                  className="max-h-[260px] max-w-full w-auto object-contain"
-                />
-              </div>
-            )}
           </div>
         ))}
 
