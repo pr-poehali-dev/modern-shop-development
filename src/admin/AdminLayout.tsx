@@ -6,6 +6,7 @@ import Icon from "@/components/ui/icon";
 const NAV = [
   { path: "/admin", label: "Дашборд", icon: "LayoutDashboard", exact: true },
   { path: "/admin/orders", label: "Заказы", icon: "ShoppingCart" },
+  { path: "/admin/requests", label: "Запросы", icon: "ClipboardList" },
   { path: "/admin/catalog", label: "Каталог", icon: "Package" },
   { path: "/admin/banners", label: "Баннеры", icon: "Image" },
   { path: "/admin/locations", label: "Локации", icon: "MapPin" },

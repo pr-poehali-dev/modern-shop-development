@@ -458,6 +458,48 @@ def handle_shop_warehouses(method, body):
     return ok({'store_ids': []})
 
 
+# --- PRODUCT REQUESTS ---
+def handle_requests(method, body, params):
+    conn = get_db()
+    cur = conn.cursor()
+    schema = 't_p9295853_modern_shop_developm'
+    if method == 'GET':
+        page = int(params.get('page', 1))
+        per_page = int(params.get('per_page', 20))
+        status_filter = params.get('status', '')
+        offset = (page - 1) * per_page
+        where = "WHERE 1=1"
+        vals = []
+        if status_filter:
+            where += " AND status = %s"
+            vals.append(status_filter)
+        cur.execute(f"SELECT COUNT(*) FROM {schema}.product_requests {where}", vals)
+        total = cur.fetchone()[0]
+        cur.execute(
+            f"SELECT id, product_id, product_name, product_sku, product_price, quantity, customer_name, customer_phone, comment, status, created_at "
+            f"FROM {schema}.product_requests {where} ORDER BY created_at DESC LIMIT %s OFFSET %s",
+            vals + [per_page, offset]
+        )
+        rows = cur.fetchall()
+        conn.close()
+        return ok({'items': [{'id': r[0], 'product_id': r[1], 'product_name': r[2], 'product_sku': r[3],
+                               'product_price': float(r[4]) if r[4] else 0, 'quantity': r[5],
+                               'customer_name': r[6], 'customer_phone': r[7], 'comment': r[8],
+                               'status': r[9], 'created_at': r[10]} for r in rows], 'total': total})
+    if method == 'PUT':
+        rid = body.get('id')
+        new_status = body.get('status')
+        if not rid:
+            conn.close()
+            return err('ID обязателен')
+        cur.execute(f"UPDATE {schema}.product_requests SET status = %s WHERE id = %s", (new_status, rid))
+        conn.commit()
+        conn.close()
+        return ok({'ok': True})
+    conn.close()
+    return err('Метод не поддерживается', 405)
+
+
 # --- ORDERS ---
 def handle_orders(method, body, params):
     conn = get_db()
@@ -540,6 +582,8 @@ def handler(event: dict, context) -> dict:
         return handle_settings(method, body)
     if action == 'orders':
         return handle_orders(method, body, params)
+    if action == 'requests':
+        return handle_requests(method, body, params)
     if action == 'promaster_stores':
         return handle_promaster_stores()
     if action == 'shop_warehouses':

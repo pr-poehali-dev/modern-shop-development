@@ -20,6 +20,7 @@ import AdminLocationsPage from "./pages/admin/AdminLocationsPage";
 import AdminWarehousesPage from "./pages/admin/AdminWarehousesPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
+import AdminRequestsPage from "./pages/admin/AdminRequestsPage";
 import AdminLayout from "./admin/AdminLayout";
 import { AdminAuthProvider } from "./admin/AdminAuth";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -58,6 +59,11 @@ const App = () => (
           <Route path="/admin/orders" element={
             <AdminAuthProvider>
               <AdminLayout><AdminOrdersPage /></AdminLayout>
+            </AdminAuthProvider>
+          } />
+          <Route path="/admin/requests" element={
+            <AdminAuthProvider>
+              <AdminLayout><AdminRequestsPage /></AdminLayout>
             </AdminAuthProvider>
           } />
           <Route path="/admin/catalog" element={
