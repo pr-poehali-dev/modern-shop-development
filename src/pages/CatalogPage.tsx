@@ -61,14 +61,27 @@ function ProductCard({ product, visibleStoreIds }: { product: Product; visibleSt
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (!user) { navigate("/login", { state: { from: "/catalog" } }); return; }
-    setAdding(true);
-    try {
-      await addToCart({
-        id: product.id, name: product.name, price: product.price,
-        image: product.image, sku: product.sku, unit: product.unit,
-      });
-    } finally {
-      setAdding(false);
+    if (inCart) { navigate("/cart"); return; }
+
+    // Если есть только один склад с товаром — добавляем сразу
+    const availableStores = (filteredStock || []).filter(s => s.quantity > 0);
+    if (availableStores.length === 1) {
+      setAdding(true);
+      try {
+        await addToCart({
+          id: product.id, name: product.name, price: product.price,
+          image: product.image, sku: product.sku, unit: product.unit,
+          store_id: availableStores[0].store_id,
+          store_name: availableStores[0].store_name,
+          max_quantity: availableStores[0].quantity,
+          stock_by_store: product.stock_by_store,
+        });
+      } finally {
+        setAdding(false);
+      }
+    } else {
+      // Несколько складов — переходим на карточку товара для выбора
+      navigate(`/product/${product.id}`);
     }
   };
 
@@ -141,7 +154,7 @@ function ProductCard({ product, visibleStoreIds }: { product: Product; visibleSt
           onClick={handleAddToCart}
           disabled={adding}
         >
-          {adding ? "Добавляю..." : inCart ? "В корзине ✓" : "В корзину"}
+          {adding ? "Добавляю..." : inCart ? "В корзине ✓" : (filteredStock || []).filter(s => s.quantity > 0).length > 1 ? "Выбрать склад →" : "В корзину"}
         </button>
       </div>
     </a>
