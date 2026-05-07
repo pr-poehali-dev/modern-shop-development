@@ -339,7 +339,12 @@ export default function AdminBannersPage() {
 
             {/* Image upload */}
             <div className="mb-4">
-              <label className="block text-xs text-gray-500 mb-2">Изображение баннера</label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs text-gray-500">Изображение баннера</label>
+                <span className="text-[11px] bg-amber-50 text-amber-600 border border-amber-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <Icon name="Ruler" size={10} /> Рекомендуется 900 × 280 px
+                </span>
+              </div>
               <div
                 className="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center cursor-pointer hover:border-[#e31e24] transition-colors relative"
                 onDragOver={e => e.preventDefault()}
