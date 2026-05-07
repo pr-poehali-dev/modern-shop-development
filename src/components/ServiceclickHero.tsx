@@ -242,11 +242,11 @@ export default function ServiceclickHero() {
 
             {/* Image */}
             {slide.image && (
-              <div className="flex-1 h-full flex items-end justify-center">
+              <div className="flex-1 h-full flex items-center justify-center overflow-hidden">
                 <img
                   src={slide.image}
                   alt={slide.title}
-                  className="h-[270px] w-auto object-contain object-bottom"
+                  className="max-h-[260px] max-w-full w-auto object-contain"
                 />
               </div>
             )}
