@@ -7,6 +7,9 @@ import os
 import hashlib
 import secrets
 import psycopg2
+import boto3
+import base64
+import uuid
 from datetime import datetime, timedelta
 
 CORS_HEADERS = {
@@ -154,32 +157,56 @@ def handle_users(method, body, user):
     return err('Метод не поддерживается', 405)
 
 
+# --- S3 UPLOAD ---
+def upload_image_to_s3(base64_data: str, filename: str) -> str:
+    s3 = boto3.client(
+        's3',
+        endpoint_url='https://bucket.poehali.dev',
+        aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+        aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+    )
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else 'jpg'
+    key = f"banners/{uuid.uuid4().hex}.{ext}"
+    content_type = f"image/{ext}" if ext != 'jpg' else 'image/jpeg'
+    if ',' in base64_data:
+        base64_data = base64_data.split(',', 1)[1]
+    data = base64.b64decode(base64_data)
+    s3.put_object(Bucket='files', Key=key, Body=data, ContentType=content_type)
+    return f"https://cdn.poehali.dev/projects/{os.environ['AWS_ACCESS_KEY_ID']}/bucket/{key}"
+
+
 # --- BANNERS ---
 def handle_banners(method, body, params):
     conn = get_db()
     cur = conn.cursor()
     if method == 'GET':
-        cur.execute("SELECT id, title, subtitle, image_url, link, button_text, is_active, sort_order, created_at FROM banners ORDER BY sort_order, id")
+        cur.execute("SELECT id, title, subtitle, image_url, link, button_text, is_active, sort_order, created_at, timer, effect, bg_color FROM banners ORDER BY sort_order, id")
         rows = cur.fetchall()
         conn.close()
-        return ok({'items': [{'id': r[0], 'title': r[1], 'subtitle': r[2], 'image_url': r[3], 'link': r[4], 'button_text': r[5], 'is_active': r[6], 'sort_order': r[7], 'created_at': r[8]} for r in rows]})
+        return ok({'items': [{'id': r[0], 'title': r[1], 'subtitle': r[2], 'image_url': r[3], 'link': r[4], 'button_text': r[5], 'is_active': r[6], 'sort_order': r[7], 'created_at': r[8], 'timer': r[9] or 5000, 'effect': r[10] or 'slide', 'bg_color': r[11] or ''} for r in rows]})
     if method == 'POST':
+        image_url = body.get('image_url', '')
+        if body.get('image_base64') and body.get('image_filename'):
+            image_url = upload_image_to_s3(body['image_base64'], body['image_filename'])
         cur.execute(
-            "INSERT INTO banners (title, subtitle, image_url, link, button_text, is_active, sort_order) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
-            (body.get('title'), body.get('subtitle'), body.get('image_url'), body.get('link'), body.get('button_text'), body.get('is_active', True), body.get('sort_order', 0))
+            "INSERT INTO banners (title, subtitle, image_url, link, button_text, is_active, sort_order, timer, effect, bg_color) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            (body.get('title'), body.get('subtitle'), image_url, body.get('link'), body.get('button_text'), body.get('is_active', True), body.get('sort_order', 0), body.get('timer', 5000), body.get('effect', 'slide'), body.get('bg_color', ''))
         )
         new_id = cur.fetchone()[0]
         conn.commit()
         conn.close()
-        return ok({'id': new_id}, 201)
+        return ok({'id': new_id, 'image_url': image_url}, 201)
     if method == 'PUT':
         bid = body.get('id')
         if not bid:
             conn.close()
             return err('ID обязателен')
+        image_url = body.get('image_url', '')
+        if body.get('image_base64') and body.get('image_filename'):
+            image_url = upload_image_to_s3(body['image_base64'], body['image_filename'])
         cur.execute(
-            "UPDATE banners SET title=%s, subtitle=%s, image_url=%s, link=%s, button_text=%s, is_active=%s, sort_order=%s, updated_at=NOW() WHERE id=%s",
-            (body.get('title'), body.get('subtitle'), body.get('image_url'), body.get('link'), body.get('button_text'), body.get('is_active', True), body.get('sort_order', 0), bid)
+            "UPDATE banners SET title=%s, subtitle=%s, image_url=%s, link=%s, button_text=%s, is_active=%s, sort_order=%s, timer=%s, effect=%s, bg_color=%s, updated_at=NOW() WHERE id=%s",
+            (body.get('title'), body.get('subtitle'), image_url, body.get('link'), body.get('button_text'), body.get('is_active', True), body.get('sort_order', 0), body.get('timer', 5000), body.get('effect', 'slide'), body.get('bg_color', ''), bid)
         )
         conn.commit()
         conn.close()
