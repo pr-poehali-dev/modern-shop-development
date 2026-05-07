@@ -88,20 +88,21 @@ function StarRating({ rating }: { rating: number }) {
 export default function ServiceclickProducts() {
   const navigate = useNavigate();
   return (
-    <div className="max-w-[1200px] mx-auto px-4 py-4">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-bold text-gray-900">Популярные товары</h2>
-        <a href="#" className="text-sm text-[#e31e24] hover:underline flex items-center gap-1">
-          Все товары <Icon name="ChevronRight" size={14} />
-        </a>
-      </div>
+    <div style={{ background: "#2d2d2d" }}>
+      <div className="max-w-[1200px] mx-auto px-4 py-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-bold text-white">Популярные товары</h2>
+          <a href="#" className="text-sm text-[#e31e24] hover:underline flex items-center gap-1">
+            Все товары <Icon name="ChevronRight" size={14} />
+          </a>
+        </div>
 
       <div className="grid grid-cols-6 gap-3">
         {products.map((p) => (
           <div
             key={p.id}
             onClick={() => navigate(`/product/${p.id}`)}
-            className="bg-white rounded-2xl border border-[#e0e0e0] hover:border-[#e31e24] hover:shadow-md transition-all cursor-pointer group flex flex-col overflow-hidden"
+            className="bg-[#3a3a3a] rounded-2xl border border-[#4a4a4a] hover:border-[#e31e24] hover:shadow-md transition-all cursor-pointer group flex flex-col overflow-hidden"
           >
             {/* Image */}
             <div className="relative">
@@ -118,24 +119,24 @@ export default function ServiceclickProducts() {
                   {p.badge}
                 </span>
               )}
-              <button className="absolute top-2 right-2 w-7 h-7 bg-white rounded-full flex items-center justify-center shadow opacity-0 group-hover:opacity-100 transition-opacity hover:text-[#e31e24]">
+              <button className="absolute top-2 right-2 w-7 h-7 bg-[#3a3a3a] rounded-full flex items-center justify-center shadow opacity-0 group-hover:opacity-100 transition-opacity hover:text-[#e31e24]">
                 <Icon name="Heart" size={14} />
               </button>
             </div>
 
             {/* Info */}
             <div className="p-3 flex flex-col flex-1">
-              <p className="text-xs text-gray-800 leading-tight line-clamp-2 mb-2 flex-1">{p.name}</p>
+              <p className="text-xs text-gray-200 leading-tight line-clamp-2 mb-2 flex-1">{p.name}</p>
 
               <div className="flex items-center gap-1 mb-2">
                 <StarRating rating={p.rating} />
-                <span className="text-[10px] text-gray-500">({p.reviews})</span>
+                <span className="text-[10px] text-gray-400">({p.reviews})</span>
               </div>
 
               <div className="mb-2">
-                <p className="text-base font-bold text-gray-900">{p.price.toLocaleString("ru")} ₽</p>
+                <p className="text-base font-bold text-white">{p.price.toLocaleString("ru")} ₽</p>
                 {p.oldPrice && (
-                  <p className="text-xs text-gray-400 line-through">{p.oldPrice.toLocaleString("ru")} ₽</p>
+                  <p className="text-xs text-gray-500 line-through">{p.oldPrice.toLocaleString("ru")} ₽</p>
                 )}
               </div>
 
@@ -147,6 +148,7 @@ export default function ServiceclickProducts() {
           </div>
         ))}
       </div>
+    </div>
     </div>
   );
 }
