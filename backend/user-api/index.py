@@ -71,6 +71,19 @@ def row_to_item(row) -> dict:
     }
 
 
+def get_stock_for_store(stock_by_store: list, store_id: int | None) -> int | None:
+    """Возвращает остаток для конкретного склада из сохранённого списка."""
+    if not stock_by_store:
+        return None
+    if store_id is not None:
+        for s in stock_by_store:
+            if int(s.get('store_id', -1)) == int(store_id):
+                return int(s.get('quantity', 0))
+        return 0
+    # Нет склада — суммируем по всем
+    return sum(int(s.get('quantity', 0)) for s in stock_by_store)
+
+
 # --- CART ---
 
 def handle_cart_get(conn, user_id: int) -> dict:
@@ -94,6 +107,7 @@ def handle_cart_add(conn, user_id: int, body: dict) -> dict:
     store_name = str(body.get('store_name', '') or '')
     max_qty_raw = body.get('max_quantity')
     max_quantity = int(max_qty_raw) if max_qty_raw is not None else None
+    stock_by_store_raw = body.get('stock_by_store')
 
     if not product_id:
         return err('Поле product_id обязательно')
@@ -102,27 +116,27 @@ def handle_cart_add(conn, user_id: int, body: dict) -> dict:
     except (TypeError, ValueError):
         product_price = 0.0
 
-    # Нельзя добавить 0 в наличии
     if max_quantity is not None and max_quantity <= 0:
         return err('Товар отсутствует на складе')
 
     quantity = 1
-
     sid_sql = str(store_id) if store_id is not None else 'NULL'
     sname_sql = f"'{escape(store_name)}'" if store_name else 'NULL'
     mq_sql = str(max_quantity) if max_quantity is not None else 'NULL'
+    sbs_sql = f"'{escape(json.dumps(stock_by_store_raw, ensure_ascii=False))}'::jsonb" if stock_by_store_raw else 'NULL'
 
     cur = conn.cursor()
     cur.execute(
         f"INSERT INTO cart_items "
-        f"(user_id, product_id, product_name, product_price, product_image, product_sku, product_unit, quantity, store_id, store_name, max_quantity) "
+        f"(user_id, product_id, product_name, product_price, product_image, product_sku, product_unit, quantity, store_id, store_name, max_quantity, stock_by_store) "
         f"VALUES ({user_id}, '{escape(product_id)}', '{escape(product_name)}', {product_price}, "
-        f"'{escape(product_image)}', '{escape(product_sku)}', '{escape(product_unit)}', {quantity}, {sid_sql}, {sname_sql}, {mq_sql}) "
+        f"'{escape(product_image)}', '{escape(product_sku)}', '{escape(product_unit)}', {quantity}, {sid_sql}, {sname_sql}, {mq_sql}, {sbs_sql}) "
         f"ON CONFLICT (user_id, product_id) DO UPDATE SET "
         f"quantity = CASE WHEN cart_items.quantity < 0 THEN {quantity} ELSE LEAST(cart_items.quantity + {quantity}, COALESCE(EXCLUDED.max_quantity, cart_items.quantity + {quantity})) END, "
         f"product_name = EXCLUDED.product_name, product_price = EXCLUDED.product_price, "
         f"product_image = EXCLUDED.product_image, product_sku = EXCLUDED.product_sku, product_unit = EXCLUDED.product_unit, "
-        f"store_id = EXCLUDED.store_id, store_name = EXCLUDED.store_name, max_quantity = EXCLUDED.max_quantity "
+        f"store_id = EXCLUDED.store_id, store_name = EXCLUDED.store_name, "
+        f"max_quantity = EXCLUDED.max_quantity, stock_by_store = EXCLUDED.stock_by_store "
         f"RETURNING id, user_id, product_id, product_name, product_price, product_image, product_sku, product_unit, quantity, store_id, store_name, max_quantity"
     )
     row = cur.fetchone()
@@ -260,14 +274,13 @@ def handle_order_create(conn, user_id: int, body: dict) -> dict:
     cur = conn.cursor()
     cur.execute(
         f"SELECT id, user_id, product_id, product_name, product_price, "
-        f"product_image, product_sku, product_unit, quantity, store_id, store_name, max_quantity "
+        f"product_image, product_sku, product_unit, quantity, store_id, store_name, max_quantity, stock_by_store "
         f"FROM cart_items WHERE user_id = {user_id} AND quantity > 0 ORDER BY created_at"
     )
     rows = cur.fetchall()
     if not rows:
         return err('Корзина пуста')
 
-    # Проверяем актуальное наличие в ProMaster + сохранённый max_quantity
     stock_errors = []
     items = []
     total_price = 0.0
@@ -278,22 +291,18 @@ def handle_order_create(conn, user_id: int, body: dict) -> dict:
         product_sku = r[6]
         store_id = r[9]
         max_qty = r[11]
+        stock_by_store = r[12]  # JSONB из БД
 
-        # Запрашиваем актуальный остаток из ProMaster
-        live_qty = fetch_live_stock(product_id, product_sku, store_id)
-        if live_qty is not None:
-            if qty > live_qty:
-                if live_qty == 0:
-                    stock_errors.append(f'«{r[3]}»: товар закончился на складе')
-                else:
-                    stock_errors.append(f'«{r[3]}»: заказано {qty} шт., доступно {live_qty} шт.')
-            # Обновляем max_quantity в БД актуальным значением
-            cur.execute(
-                f"UPDATE cart_items SET max_quantity = {live_qty} "
-                f"WHERE user_id = {user_id} AND product_id = '{escape(product_id)}'"
-            )
+        # Проверяем по сохранённому stock_by_store (снимок на момент добавления в корзину)
+        if stock_by_store:
+            saved_qty = get_stock_for_store(stock_by_store, store_id)
+            if saved_qty is not None:
+                if qty > saved_qty:
+                    if saved_qty == 0:
+                        stock_errors.append(f'«{r[3]}»: товар закончился на складе')
+                    else:
+                        stock_errors.append(f'«{r[3]}»: заказано {qty} шт., доступно {saved_qty} шт.')
         elif max_qty is not None and qty > max_qty:
-            # Если ProMaster недоступен — используем сохранённый лимит
             stock_errors.append(f'«{r[3]}»: заказано {qty} шт., доступно {max_qty} шт.')
 
         total_price += price * qty

@@ -1,0 +1,2 @@
+ALTER TABLE cart_items
+  ADD COLUMN IF NOT EXISTS stock_by_store JSONB DEFAULT NULL;

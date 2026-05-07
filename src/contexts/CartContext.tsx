@@ -34,6 +34,7 @@ interface CartContextType {
     store_id?: number | null;
     store_name?: string | null;
     max_quantity?: number | null;
+    stock_by_store?: Array<{ store_id: number; store_name: string; quantity: number }> | null;
   }) => Promise<{ ok: boolean; conflictStore?: string }>;
   updateQuantity: (product_id: string, quantity: number) => Promise<{ ok: boolean; error?: string }>;
   removeItem: (product_id: string) => Promise<void>;
@@ -84,6 +85,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     image: string; sku: string; unit: string;
     store_id?: number | null; store_name?: string | null;
     max_quantity?: number | null;
+    stock_by_store?: Array<{ store_id: number; store_name: string; quantity: number }> | null;
   }): Promise<{ ok: boolean; conflictStore?: string }> => {
     const incomingStoreId = product.store_id ?? null;
 
@@ -102,6 +104,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       store_id: incomingStoreId,
       store_name: product.store_name || null,
       max_quantity: product.max_quantity ?? null,
+      stock_by_store: product.stock_by_store ?? null,
     });
     if (data?.item) {
       setItems((prev) => {
