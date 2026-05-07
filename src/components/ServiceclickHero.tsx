@@ -260,18 +260,18 @@ export default function ServiceclickHero() {
         {TOTAL > 1 && (
           <div className="absolute bottom-4 right-4 z-20 flex flex-col items-center gap-1.5">
             <div className="flex items-center gap-2">
-              <button onClick={handlePrev} className="w-8 h-8 rounded-full bg-white/70 hover:bg-white text-gray-700 flex items-center justify-center shadow transition-colors">
+              <button onClick={handlePrev} className="w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center shadow-lg backdrop-blur-sm transition-colors">
                 <Icon name="ChevronLeft" size={16} />
               </button>
-              <span className="text-sm font-medium min-w-[44px] text-center">
+              <span className="text-sm font-medium min-w-[44px] text-center drop-shadow">
                 <span className="text-[#f47d20] font-bold">{current + 1}</span>
-                <span className="text-gray-400"> / {TOTAL}</span>
+                <span className="text-white/80"> / {TOTAL}</span>
               </span>
-              <button onClick={handleNext} className="w-8 h-8 rounded-full bg-white/70 hover:bg-white text-gray-700 flex items-center justify-center shadow transition-colors">
+              <button onClick={handleNext} className="w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center shadow-lg backdrop-blur-sm transition-colors">
                 <Icon name="ChevronRight" size={16} />
               </button>
             </div>
-            <div className="w-[88px] h-[3px] bg-white/50 rounded-full overflow-hidden">
+            <div className="w-[88px] h-[3px] bg-white/30 rounded-full overflow-hidden">
               <div
                 className="h-full bg-[#f47d20] rounded-full"
                 style={{ width: `${progress}%`, transition: progress === 0 ? "none" : "width 50ms linear" }}
