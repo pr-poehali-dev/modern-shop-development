@@ -358,8 +358,14 @@ export default function CatalogPage() {
       } else {
         const items: Product[] = data.items || [];
         items.sort((a, b) => {
-          const aInStock = a.stock_by_store?.some(s => s.quantity > 0) ? 1 : 0;
-          const bInStock = b.stock_by_store?.some(s => s.quantity > 0) ? 1 : 0;
+          const aFiltered = visibleStoreIds && visibleStoreIds.length > 0
+            ? a.stock_by_store?.filter(s => visibleStoreIds.includes(s.store_id))
+            : a.stock_by_store;
+          const bFiltered = visibleStoreIds && visibleStoreIds.length > 0
+            ? b.stock_by_store?.filter(s => visibleStoreIds.includes(s.store_id))
+            : b.stock_by_store;
+          const aInStock = aFiltered?.some(s => s.quantity > 0) ? 1 : 0;
+          const bInStock = bFiltered?.some(s => s.quantity > 0) ? 1 : 0;
           return bInStock - aInStock;
         });
         setProducts(items);
@@ -372,7 +378,7 @@ export default function CatalogPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, categoryId, search, storeId]);
+  }, [page, categoryId, search, storeId, visibleStoreIds]);
 
   useEffect(() => { loadCategories(); }, [loadCategories]);
   useEffect(() => { loadProducts(); }, [loadProducts]);
