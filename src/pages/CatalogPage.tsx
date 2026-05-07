@@ -556,26 +556,26 @@ export default function CatalogPage() {
 
 
 
-        {/* In-stock toggle button */}
+        {/* In-stock toggle */}
         <div className="flex items-center gap-2 mb-4">
-          <button
-            onClick={toggleInStock}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
-              inStockOnly
-                ? "bg-green-600 text-white border-green-600 shadow-sm"
-                : "bg-white text-gray-600 border-[#e8e8e8] hover:border-green-500 hover:text-green-600"
-            }`}
-          >
-            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${inStockOnly ? "bg-white" : "bg-green-500"}`} />
-            В наличии
+          <label className="flex items-center gap-2 cursor-pointer select-none group" onClick={toggleInStock}>
+            <span className={`w-4 h-4 rounded flex items-center justify-center border transition-all flex-shrink-0 ${
+              inStockOnly ? "bg-green-600 border-green-600" : "bg-white border-gray-300 group-hover:border-green-500"
+            }`}>
+              {inStockOnly && (
+                <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                  <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </span>
+            <span className={`text-sm font-medium transition-colors ${inStockOnly ? "text-green-700" : "text-gray-600 group-hover:text-green-600"}`}>
+              В наличии
+            </span>
             {inStockOnly && allInStockProducts !== null && (
-              <span className="ml-1 bg-white/25 rounded-lg px-1.5 py-0.5 text-xs">{allInStockProducts.length}</span>
+              <span className="text-xs text-green-600 font-medium">{allInStockProducts.length}</span>
             )}
-            {inStockLoading && <span className="ml-1 w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin inline-block" />}
-          </button>
-          {inStockOnly && (
-            <span className="text-xs text-gray-400">Показаны только товары в наличии по вашей локации</span>
-          )}
+            {inStockLoading && <span className="w-3.5 h-3.5 rounded-full border-2 border-green-200 border-t-green-600 animate-spin inline-block" />}
+          </label>
         </div>
 
         {/* Active search badge */}
