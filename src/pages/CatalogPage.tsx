@@ -11,6 +11,11 @@ import { useLocationStores } from "@/hooks/useVisibleStores";
 const API_URL = "https://functions.poehali.dev/c7265605-961b-48cb-9594-4caad2cb333e";
 const PER_PAGE = 24;
 
+const POPULAR_BRANDS = [
+  "Bosch", "Makita", "DeWalt", "Hilti", "Stanley", "Karcher",
+  "Milwaukee", "Metabo", "AEG", "Ryobi", "Black+Decker", "Festool",
+];
+
 interface StockEntry {
   store_id: number;
   store_name: string;
@@ -317,6 +322,37 @@ export default function CatalogPage() {
         </div>
 
 
+
+        {/* Popular brands */}
+        <div className="mb-5">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Популярные бренды</p>
+          <div className="flex flex-wrap gap-2">
+            {POPULAR_BRANDS.map((brand) => {
+              const active = search === brand;
+              return (
+                <button
+                  key={brand}
+                  onClick={() => {
+                    if (active) {
+                      setSearchInput("");
+                      setFilter("search", "");
+                    } else {
+                      setSearchInput(brand);
+                      setFilter("search", brand);
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-sm font-medium border transition-colors ${
+                    active
+                      ? "bg-[#e31e24] text-white border-[#e31e24]"
+                      : "bg-white text-gray-700 border-[#e8e8e8] hover:border-[#e31e24] hover:text-[#e31e24]"
+                  }`}
+                >
+                  {brand}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         {/* Active search badge */}
         {search && (
