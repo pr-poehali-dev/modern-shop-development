@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAdminAuth, ADMIN_API_URL } from "@/admin/AdminAuth";
 import Icon from "@/components/ui/icon";
+import { toast } from "sonner";
 
 // Мини-превью эффекта перехода
 function EffectPreview({ effect, image }: { effect: string; image?: string }) {
@@ -199,6 +200,7 @@ export default function AdminBannersPage() {
     setUploading(false);
     setModal(null);
     load();
+    toast.success(modal.id ? "Баннер обновлён" : "Баннер добавлен");
   };
 
   const toggleActive = async (b: Banner) => {
@@ -208,6 +210,7 @@ export default function AdminBannersPage() {
       body: JSON.stringify({ ...b, is_active: !b.is_active }),
     });
     load();
+    toast.success(b.is_active ? "Баннер скрыт" : "Баннер включён");
   };
 
   const deleteBanner = async (b: Banner) => {
@@ -217,6 +220,7 @@ export default function AdminBannersPage() {
       body: JSON.stringify({ id: b.id }),
     });
     load();
+    toast.error("Баннер удалён");
   };
 
   // Drag-and-drop для сортировки
@@ -241,6 +245,7 @@ export default function AdminBannersPage() {
         body: JSON.stringify(b),
       })
     ));
+    toast.success("Порядок сохранён");
   };
 
   return (
