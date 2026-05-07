@@ -1,19 +1,56 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
+import { useShopLocations, type ShopLocation } from "@/hooks/useVisibleStores";
 
 export default function ServiceclickHeader() {
   const { user, logout } = useAuth();
   const { count } = useCart();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
+  const shopLocations = useShopLocations();
+
+  const [selectedLocationId, setSelectedLocationId] = useState<number | null>(() => {
+    const saved = localStorage.getItem("shop_location_id");
+    return saved ? Number(saved) : null;
+  });
+  const [open, setOpen] = useState(false);
+  const dropRef = useRef<HTMLDivElement>(null);
+
+  // Закрываем дропдаун при клике вне
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropRef.current && !dropRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const selectedLocation: ShopLocation | null =
+    shopLocations?.find(l => l.id === selectedLocationId) ?? null;
+
+  const handleSelect = (loc: ShopLocation | null) => {
+    if (loc) {
+      setSelectedLocationId(loc.id);
+      localStorage.setItem("shop_location_id", String(loc.id));
+    } else {
+      setSelectedLocationId(null);
+      localStorage.removeItem("shop_location_id");
+    }
+    setOpen(false);
+    window.dispatchEvent(new Event("shop_location_changed"));
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) navigate(`/catalog?search=${encodeURIComponent(query.trim())}`);
   };
+
+  const hasLocations = shopLocations && shopLocations.length > 0;
 
   return (
     <header className="bg-[#e31e24] text-white">
@@ -27,7 +64,6 @@ export default function ServiceclickHeader() {
             <a href="#" className="hover:underline opacity-90">Сервисный центр</a>
           </div>
           <div className="flex gap-4 items-center">
-            <a href="#" className="hover:underline opacity-90">Москва</a>
             {user ? (
               <span className="opacity-90">
                 {user.name} ·{" "}
@@ -49,11 +85,52 @@ export default function ServiceclickHeader() {
           </div>
         </a>
 
-        {/* Catalog button */}
-        <a href="/catalog" className="flex items-center gap-2 bg-white text-[#e31e24] font-semibold px-4 py-2 rounded text-sm flex-shrink-0 hover:bg-gray-100 transition-colors">
-          <Icon name="LayoutGrid" size={16} />
-          Каталог
-        </a>
+        {/* Выбор локации / fallback каталог */}
+        {hasLocations ? (
+          <div className="relative flex-shrink-0" ref={dropRef}>
+            <button
+              onClick={() => setOpen(o => !o)}
+              className="flex items-center gap-2 bg-white text-[#e31e24] font-semibold px-4 py-2 rounded text-sm hover:bg-gray-100 transition-colors min-w-[140px]"
+            >
+              <Icon name="MapPin" size={15} />
+              <span className="truncate max-w-[110px]">
+                {selectedLocation ? (selectedLocation.city || selectedLocation.name) : "Весь сайт"}
+              </span>
+              <Icon name="ChevronDown" size={14} className={`ml-auto transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`} />
+            </button>
+
+            {open && (
+              <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 min-w-[180px] py-1 overflow-hidden">
+                <button
+                  onClick={() => handleSelect(null)}
+                  className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left hover:bg-gray-50 transition-colors ${!selectedLocationId ? "text-[#e31e24] font-semibold" : "text-gray-700"}`}
+                >
+                  <Icon name="Globe" size={14} className="flex-shrink-0" />
+                  Весь сайт
+                </button>
+                <div className="h-px bg-gray-100 mx-3 my-1" />
+                {shopLocations!.map(loc => (
+                  <button
+                    key={loc.id}
+                    onClick={() => handleSelect(loc)}
+                    className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left hover:bg-gray-50 transition-colors ${selectedLocationId === loc.id ? "text-[#e31e24] font-semibold bg-red-50" : "text-gray-700"}`}
+                  >
+                    <Icon name="MapPin" size={14} className="flex-shrink-0" />
+                    {loc.city || loc.name}
+                    {selectedLocationId === loc.id && (
+                      <Icon name="Check" size={13} className="ml-auto text-[#e31e24]" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <a href="/catalog" className="flex items-center gap-2 bg-white text-[#e31e24] font-semibold px-4 py-2 rounded text-sm flex-shrink-0 hover:bg-gray-100 transition-colors">
+            <Icon name="LayoutGrid" size={16} />
+            Каталог
+          </a>
+        )}
 
         {/* Search */}
         <form onSubmit={handleSearch} className="flex-1 relative">

@@ -6,7 +6,7 @@ import ServiceclickNav from "@/components/ServiceclickNav";
 import ServiceclickFooter from "@/components/ServiceclickFooter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
-import { useVisibleStores, useShopLocations } from "@/hooks/useVisibleStores";
+import { useLocationStores } from "@/hooks/useVisibleStores";
 
 const API_URL = "https://functions.poehali.dev/c7265605-961b-48cb-9594-4caad2cb333e";
 
@@ -101,18 +101,7 @@ export default function ProductPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToCart, items } = useCart();
-  const globalStoreIds = useVisibleStores();
-  const shopLocations = useShopLocations();
-
-  // Итоговый список складов с учётом сохранённой локации
-  const visibleStoreIds: number[] | null = (() => {
-    const savedLoc = localStorage.getItem("shop_location_id");
-    if (shopLocations && shopLocations.length > 0 && savedLoc) {
-      const loc = shopLocations.find(l => l.id === Number(savedLoc));
-      if (loc) return loc.store_ids.length > 0 ? loc.store_ids : null;
-    }
-    return globalStoreIds;
-  })();
+  const visibleStoreIds = useLocationStores();
 
   const [adding, setAdding] = useState(false);
   const inCart = items.some((i) => i.product_id === String(id));

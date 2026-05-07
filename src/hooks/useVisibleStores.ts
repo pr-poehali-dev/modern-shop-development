@@ -67,3 +67,40 @@ export function useShopLocations() {
 
   return locations;
 }
+
+/**
+ * Итоговый список складов с учётом выбранной локации.
+ * Реагирует на изменения через кастомное событие shop_location_changed.
+ */
+export function useLocationStores(): number[] | null {
+  const globalStoreIds = useVisibleStores();
+  const shopLocations = useShopLocations();
+
+  const [locationId, setLocationId] = useState<number | null>(() => {
+    const saved = localStorage.getItem("shop_location_id");
+    return saved ? Number(saved) : null;
+  });
+
+  useEffect(() => {
+    const onCustom = () => {
+      const saved = localStorage.getItem("shop_location_id");
+      setLocationId(saved ? Number(saved) : null);
+    };
+    window.addEventListener("shop_location_changed", onCustom);
+    // cross-tab sync
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "shop_location_id") onCustom();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("shop_location_changed", onCustom);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  if (shopLocations && shopLocations.length > 0 && locationId !== null) {
+    const loc = shopLocations.find(l => l.id === locationId);
+    if (loc) return loc.store_ids.length > 0 ? loc.store_ids : null;
+  }
+  return globalStoreIds;
+}

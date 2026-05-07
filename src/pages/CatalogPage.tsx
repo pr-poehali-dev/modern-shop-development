@@ -6,7 +6,7 @@ import ServiceclickFooter from "@/components/ServiceclickFooter";
 import Icon from "@/components/ui/icon";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
-import { useVisibleStores, useShopLocations } from "@/hooks/useVisibleStores";
+import { useLocationStores } from "@/hooks/useVisibleStores";
 
 const API_URL = "https://functions.poehali.dev/c7265605-961b-48cb-9594-4caad2cb333e";
 const PER_PAGE = 24;
@@ -165,23 +165,7 @@ function SkeletonCard() {
 
 export default function CatalogPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const globalStoreIds = useVisibleStores();
-  const shopLocations = useShopLocations();
-
-  // Локация из localStorage или первая доступная
-  const [selectedLocationId, setSelectedLocationId] = useState<number | null>(() => {
-    const saved = localStorage.getItem("shop_location_id");
-    return saved ? Number(saved) : null;
-  });
-
-  // Итоговый список разрешённых складов с учётом локации
-  const visibleStoreIds: number[] | null = (() => {
-    if (shopLocations && shopLocations.length > 0 && selectedLocationId !== null) {
-      const loc = shopLocations.find(l => l.id === selectedLocationId);
-      if (loc) return loc.store_ids.length > 0 ? loc.store_ids : null;
-    }
-    return globalStoreIds;
-  })();
+  const visibleStoreIds = useLocationStores();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -196,12 +180,6 @@ export default function CatalogPage() {
   const search = searchParams.get("search") || "";
   const storeId = searchParams.get("store") || "";
   const [searchInput, setSearchInput] = useState(search);
-
-  const handleLocationChange = (locId: number | null) => {
-    setSelectedLocationId(locId);
-    if (locId !== null) localStorage.setItem("shop_location_id", String(locId));
-    else localStorage.removeItem("shop_location_id");
-  };
 
   const totalPages = Math.ceil(total / PER_PAGE);
 
@@ -326,38 +304,6 @@ export default function CatalogPage() {
         </div>
 
 
-
-        {/* Выбор локации */}
-        {shopLocations && shopLocations.length > 0 && (
-          <div className="flex items-center gap-2 mb-4 flex-wrap">
-            <span className="text-xs text-gray-500 flex-shrink-0 flex items-center gap-1">
-              <Icon name="MapPin" size={13} /> Город:
-            </span>
-            <button
-              onClick={() => handleLocationChange(null)}
-              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                selectedLocationId === null
-                  ? "bg-[#e31e24] text-white border-[#e31e24]"
-                  : "border-[#e8e8e8] bg-white text-gray-700 hover:border-[#e31e24]"
-              }`}
-            >
-              Все
-            </button>
-            {shopLocations.map(loc => (
-              <button
-                key={loc.id}
-                onClick={() => handleLocationChange(loc.id)}
-                className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                  selectedLocationId === loc.id
-                    ? "bg-[#e31e24] text-white border-[#e31e24]"
-                    : "border-[#e8e8e8] bg-white text-gray-700 hover:border-[#e31e24]"
-                }`}
-              >
-                {loc.city || loc.name}
-              </button>
-            ))}
-          </div>
-        )}
 
         {/* Active search badge */}
         {search && (
