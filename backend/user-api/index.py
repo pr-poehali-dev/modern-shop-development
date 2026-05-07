@@ -62,6 +62,8 @@ def row_to_item(row) -> dict:
         'product_sku': row[6],
         'product_unit': row[7],
         'quantity': row[8],
+        'store_id': row[9],
+        'store_name': row[10],
     }
 
 
@@ -71,7 +73,7 @@ def handle_cart_get(conn, user_id: int) -> dict:
     cur = conn.cursor()
     cur.execute(
         f"SELECT id, user_id, product_id, product_name, product_price, "
-        f"product_image, product_sku, product_unit, quantity "
+        f"product_image, product_sku, product_unit, quantity, store_id, store_name "
         f"FROM cart_items WHERE user_id = {user_id} AND quantity > 0 ORDER BY created_at"
     )
     return ok({'items': [row_to_item(r) for r in cur.fetchall()]})
@@ -84,6 +86,9 @@ def handle_cart_add(conn, user_id: int, body: dict) -> dict:
     product_sku = str(body.get('product_sku', '') or '')
     product_unit = str(body.get('product_unit', '') or 'шт')
     quantity = int(body.get('quantity', 1))
+    store_id_raw = body.get('store_id')
+    store_id = int(store_id_raw) if store_id_raw is not None else None
+    store_name = str(body.get('store_name', '') or '')
     if not product_id:
         return err('Поле product_id обязательно')
     if quantity < 1:
@@ -93,17 +98,21 @@ def handle_cart_add(conn, user_id: int, body: dict) -> dict:
     except (TypeError, ValueError):
         product_price = 0.0
 
+    sid_sql = str(store_id) if store_id is not None else 'NULL'
+    sname_sql = f"'{escape(store_name)}'" if store_name else 'NULL'
+
     cur = conn.cursor()
     cur.execute(
         f"INSERT INTO cart_items "
-        f"(user_id, product_id, product_name, product_price, product_image, product_sku, product_unit, quantity) "
+        f"(user_id, product_id, product_name, product_price, product_image, product_sku, product_unit, quantity, store_id, store_name) "
         f"VALUES ({user_id}, '{escape(product_id)}', '{escape(product_name)}', {product_price}, "
-        f"'{escape(product_image)}', '{escape(product_sku)}', '{escape(product_unit)}', {quantity}) "
+        f"'{escape(product_image)}', '{escape(product_sku)}', '{escape(product_unit)}', {quantity}, {sid_sql}, {sname_sql}) "
         f"ON CONFLICT (user_id, product_id) DO UPDATE SET "
         f"quantity = CASE WHEN cart_items.quantity < 0 THEN EXCLUDED.quantity ELSE cart_items.quantity + EXCLUDED.quantity END, "
         f"product_name = EXCLUDED.product_name, product_price = EXCLUDED.product_price, "
-        f"product_image = EXCLUDED.product_image, product_sku = EXCLUDED.product_sku, product_unit = EXCLUDED.product_unit "
-        f"RETURNING id, user_id, product_id, product_name, product_price, product_image, product_sku, product_unit, quantity"
+        f"product_image = EXCLUDED.product_image, product_sku = EXCLUDED.product_sku, product_unit = EXCLUDED.product_unit, "
+        f"store_id = EXCLUDED.store_id, store_name = EXCLUDED.store_name "
+        f"RETURNING id, user_id, product_id, product_name, product_price, product_image, product_sku, product_unit, quantity, store_id, store_name"
     )
     row = cur.fetchone()
     conn.commit()

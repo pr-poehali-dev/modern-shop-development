@@ -12,6 +12,8 @@ export interface CartItem {
   product_sku: string;
   product_unit: string;
   quantity: number;
+  store_id: number | null;
+  store_name: string | null;
 }
 
 interface CartContextType {
@@ -19,6 +21,8 @@ interface CartContextType {
   count: number;
   total: number;
   loading: boolean;
+  cartStoreId: number | null;
+  cartStoreName: string | null;
   addToCart: (product: {
     id: string | number;
     name: string;
@@ -26,7 +30,9 @@ interface CartContextType {
     image: string;
     sku: string;
     unit: string;
-  }) => Promise<void>;
+    store_id?: number | null;
+    store_name?: string | null;
+  }) => Promise<{ ok: boolean; conflictStore?: string }>;
   updateQuantity: (product_id: string, quantity: number) => Promise<void>;
   removeItem: (product_id: string) => Promise<void>;
   clearCart: () => Promise<void>;
@@ -68,10 +74,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
     reload();
   }, [user, reload]);
 
+  // Текущий склад корзины — берём из первого товара
+  const cartStoreId = items.length > 0 ? (items[0].store_id ?? null) : null;
+  const cartStoreName = items.length > 0 ? (items[0].store_name ?? null) : null;
+
   const addToCart = async (product: {
     id: string | number; name: string; price: number;
     image: string; sku: string; unit: string;
-  }) => {
+    store_id?: number | null; store_name?: string | null;
+  }): Promise<{ ok: boolean; conflictStore?: string }> => {
+    const incomingStoreId = product.store_id ?? null;
+
+    // Проверяем конфликт склада
+    if (items.length > 0 && cartStoreId !== null && incomingStoreId !== null && cartStoreId !== incomingStoreId) {
+      return { ok: false, conflictStore: cartStoreName || `Склад #${cartStoreId}` };
+    }
+
     const data = await call({
       action: "cart.add",
       product_id: String(product.id),
@@ -81,6 +99,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       product_sku: product.sku || "",
       product_unit: product.unit || "шт",
       quantity: 1,
+      store_id: incomingStoreId,
+      store_name: product.store_name || null,
     });
     if (data?.item) {
       setItems((prev) => {
@@ -93,6 +113,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return [...prev, data.item];
       });
     }
+    return { ok: true };
   };
 
   const updateQuantity = async (product_id: string, quantity: number) => {
@@ -120,7 +141,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const total = items.reduce((s, i) => s + i.product_price * i.quantity, 0);
 
   return (
-    <CartContext.Provider value={{ items, count, total, loading, addToCart, updateQuantity, removeItem, clearCart, reload }}>
+    <CartContext.Provider value={{ items, count, total, loading, cartStoreId, cartStoreName, addToCart, updateQuantity, removeItem, clearCart, reload }}>
       {children}
     </CartContext.Provider>
   );

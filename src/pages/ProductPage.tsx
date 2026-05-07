@@ -100,10 +100,12 @@ export default function ProductPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { addToCart, items } = useCart();
+  const { addToCart, items, cartStoreId } = useCart();
   const visibleStoreIds = useLocationStores();
 
   const [adding, setAdding] = useState(false);
+  const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
+  const [conflictMsg, setConflictMsg] = useState<string | null>(null);
   const inCart = items.some((i) => i.product_id === String(id));
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -295,46 +297,98 @@ export default function ProductPage() {
                     )}
                   </div>
 
-                  {/* Stock by store */}
+                  {/* Stock by store — выбор склада */}
                   {(() => {
                     const filteredStock = visibleStoreIds && visibleStoreIds.length > 0
                       ? product.stock_by_store.filter(s => visibleStoreIds.includes(s.store_id))
                       : product.stock_by_store;
-                    return filteredStock.length > 0 ? (
-                      <div className="flex flex-col gap-1.5 mt-1 bg-[#f8f8f8] rounded-xl p-3">
-                        {filteredStock.map((s) => (
-                          <div key={s.store_id} className="flex items-center gap-2">
-                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.quantity > 0 ? "bg-green-500" : "bg-gray-300"}`} />
-                            <span className="text-sm text-gray-600">{s.store_name}</span>
-                            <span className={`text-sm font-medium ml-auto ${s.quantity > 0 ? "text-green-600" : "text-gray-400"}`}>
-                              {s.quantity > 0 ? `${s.quantity} ${product.unit || "шт"}` : "Нет"}
-                            </span>
-                          </div>
-                        ))}
+                    if (filteredStock.length === 0) return null;
+                    return (
+                      <div className="mt-1">
+                        <p className="text-xs text-gray-500 mb-1.5 font-medium">Выберите склад для заказа:</p>
+                        <div className="flex flex-col gap-1.5">
+                          {filteredStock.map((s) => {
+                            const isSelected = selectedStoreId === s.store_id;
+                            const isCartStore = cartStoreId !== null && cartStoreId === s.store_id;
+                            const conflictWithCart = cartStoreId !== null && cartStoreId !== s.store_id && items.length > 0;
+                            return (
+                              <button
+                                key={s.store_id}
+                                disabled={inCart || s.quantity <= 0}
+                                onClick={() => {
+                                  if (s.quantity > 0 && !inCart) {
+                                    setSelectedStoreId(isSelected ? null : s.store_id);
+                                    setConflictMsg(null);
+                                  }
+                                }}
+                                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                                  s.quantity <= 0
+                                    ? "border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed"
+                                    : isSelected
+                                    ? "border-[#e31e24] bg-red-50"
+                                    : conflictWithCart
+                                    ? "border-orange-200 bg-orange-50 cursor-pointer hover:border-orange-300"
+                                    : "border-gray-100 bg-[#f8f8f8] cursor-pointer hover:border-gray-300"
+                                }`}
+                              >
+                                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                                  isSelected ? "border-[#e31e24] bg-[#e31e24]" : "border-gray-300"
+                                }`}>
+                                  {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                </div>
+                                <span className={`text-sm flex-1 ${isSelected ? "font-semibold text-gray-900" : "text-gray-700"}`}>
+                                  {s.store_name}
+                                  {isCartStore && <span className="ml-1.5 text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">текущий склад корзины</span>}
+                                  {conflictWithCart && !isCartStore && <span className="ml-1.5 text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full">другой склад</span>}
+                                </span>
+                                <span className={`text-sm font-medium ml-auto flex-shrink-0 ${s.quantity > 0 ? "text-green-600" : "text-gray-400"}`}>
+                                  {s.quantity > 0 ? `${s.quantity} ${product.unit || "шт"}` : "Нет"}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    ) : null;
+                    );
                   })()}
+
+                  {conflictMsg && (
+                    <div className="flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-xl px-3 py-2.5 text-sm text-orange-700">
+                      <Icon name="AlertTriangle" size={16} className="flex-shrink-0 mt-0.5" />
+                      <span>В корзине уже есть товары со склада <b>{conflictMsg}</b>. Очистите корзину или выберите тот же склад.</span>
+                    </div>
+                  )}
 
                   <button
                     className={`mt-2 w-full text-base font-semibold py-3.5 rounded-xl transition-all ${
                       inCart
                         ? "bg-green-500 hover:bg-green-600 text-white"
-                        : "bg-[#e31e24] hover:bg-[#c41920] text-white hover:shadow-md"
+                        : selectedStoreId !== null
+                        ? "bg-[#e31e24] hover:bg-[#c41920] text-white hover:shadow-md"
+                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
                     }`}
-                    disabled={adding}
+                    disabled={adding || (!inCart && selectedStoreId === null)}
                     onClick={async () => {
                       if (!user) { navigate("/login", { state: { from: `/product/${id}` } }); return; }
                       if (inCart) { navigate("/cart"); return; }
+                      if (!selectedStoreId) return;
                       setAdding(true);
+                      setConflictMsg(null);
                       try {
-                        await addToCart({
+                        const selectedStore = product.stock_by_store.find(s => s.store_id === selectedStoreId);
+                        const result = await addToCart({
                           id: product.id, name: product.name, price: product.price,
                           image: product.image, sku: product.sku, unit: product.unit,
+                          store_id: selectedStoreId,
+                          store_name: selectedStore?.store_name || null,
                         });
+                        if (!result.ok && result.conflictStore) {
+                          setConflictMsg(result.conflictStore);
+                        }
                       } finally { setAdding(false); }
                     }}
                   >
-                    {adding ? "Добавляю..." : inCart ? "Перейти в корзину →" : "В корзину"}
+                    {adding ? "Добавляю..." : inCart ? "Перейти в корзину →" : selectedStoreId ? "В корзину" : "Выберите склад"}
                   </button>
 
                   {/* Description */}

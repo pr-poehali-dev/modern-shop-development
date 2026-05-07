@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 
 export default function CartPage() {
   const { user } = useAuth();
-  const { items, count, total, loading, updateQuantity, removeItem, clearCart } = useCart();
+  const { items, count, total, loading, updateQuantity, removeItem, clearCart, cartStoreName } = useCart();
   const navigate = useNavigate();
 
   if (!user) {
@@ -47,9 +47,24 @@ export default function CartPage() {
             <span className="text-gray-800 font-medium">Корзина</span>
           </div>
 
-          <h1 className="text-2xl font-bold text-gray-900 mb-6">
-            Корзина {count > 0 && <span className="text-gray-400 font-normal text-lg">({count} {count === 1 ? "товар" : count < 5 ? "товара" : "товаров"})</span>}
-          </h1>
+          <div className="flex items-center gap-3 mb-6 flex-wrap">
+            <h1 className="text-2xl font-bold text-gray-900">
+              Корзина {count > 0 && <span className="text-gray-400 font-normal text-lg">({count} {count === 1 ? "товар" : count < 5 ? "товара" : "товаров"})</span>}
+            </h1>
+            {cartStoreName && (
+              <span className="flex items-center gap-1.5 text-sm bg-green-50 border border-green-200 text-green-700 px-3 py-1 rounded-full">
+                <Icon name="Warehouse" size={13} />
+                {cartStoreName}
+              </span>
+            )}
+          </div>
+
+          {cartStoreName && (
+            <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-4 text-sm text-blue-700">
+              <Icon name="Info" size={15} className="flex-shrink-0" />
+              Все товары в корзине заказываются со склада <b>{cartStoreName}</b>. Чтобы добавить товар с другого склада — очистите корзину.
+            </div>
+          )}
 
           {loading && (
             <div className="flex justify-center py-12">
@@ -87,6 +102,12 @@ export default function CartPage() {
                       </a>
                       {item.product_sku && (
                         <p className="text-xs text-gray-400 mt-0.5">Арт. {item.product_sku}</p>
+                      )}
+                      {item.store_name && (
+                        <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                          <Icon name="Warehouse" size={11} />
+                          {item.store_name}
+                        </p>
                       )}
                       <p className="text-base font-bold text-gray-900 mt-1">
                         {(item.product_price * item.quantity).toLocaleString("ru")} ₽
@@ -132,10 +153,17 @@ export default function CartPage() {
                     <span>Товары ({count} шт)</span>
                     <span>{total.toLocaleString("ru")} ₽</span>
                   </div>
-                  <div className="flex justify-between text-sm text-gray-600 mb-4">
+                  <div className="flex justify-between text-sm text-gray-600 mb-3">
                     <span>Доставка</span>
                     <span className="text-green-600">Бесплатно от 1 000 ₽</span>
                   </div>
+                  {cartStoreName && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600 mb-3 pb-3 border-b border-gray-100">
+                      <Icon name="Warehouse" size={14} className="text-gray-400 flex-shrink-0" />
+                      <span className="text-gray-500">Склад:</span>
+                      <span className="font-medium text-gray-800 truncate">{cartStoreName}</span>
+                    </div>
+                  )}
                   <div className="border-t border-gray-100 pt-4 mb-4">
                     <div className="flex justify-between font-bold text-lg text-gray-900">
                       <span>Сумма</span>
