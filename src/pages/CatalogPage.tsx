@@ -52,8 +52,8 @@ function ProductCard({ product }: { product: Product }) {
   const fallbackImg = `https://picsum.photos/seed/${product.id}/300/300`;
 
   return (
-    <div className="border border-[#444] rounded-2xl overflow-hidden hover:border-[#e31e24] hover:shadow-md transition-all cursor-pointer group flex flex-col bg-[#3a3a3a]">
-      <div className="relative bg-[#2d2d2d] flex items-center justify-center" style={{ height: 180 }}>
+    <div className="border border-[#e8e8e8] rounded-2xl overflow-hidden hover:border-[#e31e24] hover:shadow-md transition-all cursor-pointer group flex flex-col bg-white">
+      <div className="relative bg-[#f8f8f8] flex items-center justify-center" style={{ height: 180 }}>
         <img
           src={imgError || !product.image ? fallbackImg : product.image}
           alt={product.name}
@@ -87,14 +87,14 @@ function ProductCard({ product }: { product: Product }) {
         {product.sku && (
           <span className="text-[10px] text-gray-400">Арт. {product.sku}</span>
         )}
-        <p className="text-sm text-gray-200 leading-snug line-clamp-3 flex-1">
+        <p className="text-sm text-gray-800 leading-snug line-clamp-3 flex-1">
           {product.name}
         </p>
         {product.category_name && (
-          <span className="text-[10px] text-gray-500">{product.category_name}</span>
+          <span className="text-[10px] text-gray-400">{product.category_name}</span>
         )}
         <div className="flex items-baseline gap-2 mt-2">
-          <span className="text-lg font-bold text-white">
+          <span className="text-lg font-bold text-gray-900">
             {product.price > 0 ? product.price.toLocaleString("ru") + " ₽" : "Цена по запросу"}
           </span>
           {product.old_price && product.old_price > product.price && (
@@ -113,14 +113,14 @@ function ProductCard({ product }: { product: Product }) {
 
 function SkeletonCard() {
   return (
-    <div className="border border-[#444] rounded-2xl overflow-hidden flex flex-col bg-[#3a3a3a] animate-pulse">
-      <div className="bg-[#2d2d2d]" style={{ height: 180 }} />
+    <div className="border border-[#e8e8e8] rounded-2xl overflow-hidden flex flex-col bg-white animate-pulse">
+      <div className="bg-gray-100" style={{ height: 180 }} />
       <div className="p-3 flex flex-col gap-2">
-        <div className="h-3 bg-[#444] rounded w-1/3" />
-        <div className="h-4 bg-[#444] rounded w-full" />
-        <div className="h-4 bg-[#444] rounded w-3/4" />
-        <div className="h-5 bg-[#444] rounded w-1/2 mt-1" />
-        <div className="h-9 bg-[#444] rounded-xl mt-1" />
+        <div className="h-3 bg-gray-100 rounded w-1/3" />
+        <div className="h-4 bg-gray-100 rounded w-full" />
+        <div className="h-4 bg-gray-100 rounded w-3/4" />
+        <div className="h-5 bg-gray-100 rounded w-1/2 mt-1" />
+        <div className="h-9 bg-gray-100 rounded-xl mt-1" />
       </div>
     </div>
   );
@@ -211,7 +211,7 @@ export default function CatalogPage() {
   const selectedCategory = categories.find((c) => String(c.id) === categoryId);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#2d2d2d]">
+    <div className="min-h-screen flex flex-col bg-[#f5f5f5]">
       {loading && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="w-12 h-12 rounded-full border-4 border-red-100 border-t-[#e31e24] animate-spin" />
@@ -223,21 +223,21 @@ export default function CatalogPage() {
       <main className="flex-1 max-w-[1200px] mx-auto w-full px-4 py-6">
 
         {/* Breadcrumb */}
-        <div className="flex items-center gap-1.5 text-sm text-gray-400 mb-4">
+        <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-4">
           <a href="/" className="hover:text-[#e31e24]">Главная</a>
           <Icon name="ChevronRight" size={14} />
-          <span className="text-gray-200 font-medium">Каталог</span>
+          <span className="text-gray-800 font-medium">Каталог</span>
           {selectedCategory && (
             <>
               <Icon name="ChevronRight" size={14} />
-              <span className="text-gray-200 font-medium">{selectedCategory.name}</span>
+              <span className="text-gray-800 font-medium">{selectedCategory.name}</span>
             </>
           )}
         </div>
 
         {/* Title + search */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
-          <h1 className="text-2xl font-bold text-white flex-1">
+          <h1 className="text-2xl font-bold text-gray-900 flex-1">
             {selectedCategory ? selectedCategory.name : "Каталог товаров"}
             {total > 0 && !loading && (
               <span className="ml-2 text-base text-gray-400 font-normal">
@@ -253,7 +253,7 @@ export default function CatalogPage() {
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Поиск по каталогу..."
-                className="w-full pl-9 pr-3 py-2 text-sm border border-[#444] rounded-xl bg-[#3a3a3a] text-white placeholder-gray-500 focus:outline-none focus:border-[#e31e24]"
+                className="w-full pl-9 pr-3 py-2 text-sm border border-[#e8e8e8] rounded-xl bg-white focus:outline-none focus:border-[#e31e24]"
               />
             </div>
             <button
@@ -271,7 +271,7 @@ export default function CatalogPage() {
             <button
               onClick={() => setFilter("category", "")}
               className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                !categoryId ? "bg-[#e31e24] text-white border-[#e31e24]" : "border-[#555] bg-[#3a3a3a] text-gray-300 hover:border-[#e31e24]"
+                !categoryId ? "bg-[#e31e24] text-white border-[#e31e24]" : "border-[#e8e8e8] bg-white text-gray-700"
               }`}
             >
               Все
@@ -283,7 +283,7 @@ export default function CatalogPage() {
                 className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full border transition-colors ${
                   String(cat.id) === categoryId
                     ? "bg-[#e31e24] text-white border-[#e31e24]"
-                    : "border-[#555] bg-[#3a3a3a] text-gray-300 hover:border-[#e31e24]"
+                    : "border-[#e8e8e8] bg-white text-gray-700"
                 }`}
               >
                 {cat.name}
@@ -295,13 +295,13 @@ export default function CatalogPage() {
         {/* Склады */}
         {stores.length > 0 && (
           <div className="flex items-center gap-2 mb-4 flex-wrap">
-            <span className="text-xs text-gray-400 flex-shrink-0 flex items-center gap-1">
+            <span className="text-xs text-gray-500 flex-shrink-0 flex items-center gap-1">
               <Icon name="Warehouse" size={13} /> Склад:
             </span>
             <button
               onClick={() => setFilter("store", "")}
               className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                !storeId ? "bg-[#e31e24] text-white border-[#e31e24]" : "border-[#555] bg-[#3a3a3a] text-gray-300 hover:border-[#e31e24]"
+                !storeId ? "bg-[#e31e24] text-white border-[#e31e24]" : "border-[#e8e8e8] bg-white text-gray-700 hover:border-[#e31e24]"
               }`}
             >
               Все склады
@@ -311,7 +311,7 @@ export default function CatalogPage() {
                 key={s.id}
                 onClick={() => setFilter("store", String(s.id))}
                 className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                  String(s.id) === storeId ? "bg-[#e31e24] text-white border-[#e31e24]" : "border-[#555] bg-[#3a3a3a] text-gray-300 hover:border-[#e31e24]"
+                  String(s.id) === storeId ? "bg-[#e31e24] text-white border-[#e31e24]" : "border-[#e8e8e8] bg-white text-gray-700 hover:border-[#e31e24]"
                 }`}
               >
                 {s.name}
@@ -323,7 +323,7 @@ export default function CatalogPage() {
         {/* Active search badge */}
         {search && (
           <div className="flex items-center gap-2 mb-4">
-            <span className="text-sm text-gray-300">
+            <span className="text-sm text-gray-600">
               Результаты поиска: <strong>«{search}»</strong>
             </span>
             <button
@@ -361,7 +361,7 @@ export default function CatalogPage() {
         ) : !error ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-400">
             <Icon name="PackageSearch" size={48} className="mb-3" />
-            <p className="font-medium text-gray-300">Товары не найдены</p>
+            <p className="font-medium text-gray-600">Товары не найдены</p>
             <p className="text-sm mt-1">Попробуйте изменить фильтры или поисковый запрос</p>
           </div>
         ) : null}
@@ -372,7 +372,7 @@ export default function CatalogPage() {
             <button
               onClick={() => goPage(page - 1)}
               disabled={page <= 1}
-              className="w-9 h-9 rounded-xl border border-[#555] bg-[#3a3a3a] flex items-center justify-center text-gray-300 hover:border-[#e31e24] hover:text-[#e31e24] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="w-9 h-9 rounded-xl border border-[#e8e8e8] bg-white flex items-center justify-center text-gray-500 hover:border-[#e31e24] hover:text-[#e31e24] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <Icon name="ChevronLeft" size={16} />
             </button>
@@ -395,7 +395,7 @@ export default function CatalogPage() {
                   className={`w-9 h-9 rounded-xl border text-sm font-medium transition-colors ${
                     p === page
                       ? "bg-[#e31e24] text-white border-[#e31e24]"
-                      : "bg-[#3a3a3a] border-[#555] text-gray-300 hover:border-[#e31e24] hover:text-[#e31e24]"
+                      : "bg-white border-[#e8e8e8] text-gray-700 hover:border-[#e31e24] hover:text-[#e31e24]"
                   }`}
                 >
                   {p}
@@ -406,7 +406,7 @@ export default function CatalogPage() {
             <button
               onClick={() => goPage(page + 1)}
               disabled={page >= totalPages}
-              className="w-9 h-9 rounded-xl border border-[#555] bg-[#3a3a3a] flex items-center justify-center text-gray-300 hover:border-[#e31e24] hover:text-[#e31e24] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="w-9 h-9 rounded-xl border border-[#e8e8e8] bg-white flex items-center justify-center text-gray-500 hover:border-[#e31e24] hover:text-[#e31e24] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <Icon name="ChevronRight" size={16} />
             </button>
