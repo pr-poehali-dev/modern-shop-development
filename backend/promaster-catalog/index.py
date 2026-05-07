@@ -253,9 +253,12 @@ def fetch_categories_from_products(headers):
 def normalize_product(p, stores, all_stock):
     images = p.get("images", [])
     image = ""
-    if images and isinstance(images, list):
+    if images and isinstance(images, list) and len(images) > 0:
         first = images[0]
-        image = first.get("url", first) if isinstance(first, dict) else first
+        if isinstance(first, dict):
+            image = first.get("url") or first.get("src") or first.get("path") or first.get("link") or ""
+        elif isinstance(first, str):
+            image = first
     if image and not str(image).startswith("http"):
         image = f"{BASE_URL}{image}"
 
