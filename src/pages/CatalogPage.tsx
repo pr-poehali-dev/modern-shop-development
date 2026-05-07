@@ -47,11 +47,48 @@ interface Category {
   count: number;
 }
 
+function OrderModal({ product, onClose }: { product: Product; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between mb-4">
+          <h3 className="font-bold text-gray-900 text-base leading-snug pr-4">Заказ товара под запрос</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+            <Icon name="X" size={20} />
+          </button>
+        </div>
+        <p className="text-sm text-gray-600 leading-relaxed mb-5">
+          Если товара нет в наличии в нашем интернет каталоге, он может быть на основном складе. Укажите ваши контактные данные и нужное количество. Наш менеджер уточнит наличие и вам перезвонит.
+        </p>
+        <div className="bg-gray-50 rounded-xl p-3 flex gap-3 items-center mb-5">
+          {product.image && (
+            <img src={product.image} alt={product.name} className="w-14 h-14 object-cover rounded-lg flex-shrink-0" />
+          )}
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-gray-800 line-clamp-2">{product.name}</p>
+            {product.sku && <p className="text-xs text-gray-400 mt-0.5">Арт. {product.sku}</p>}
+            <p className="text-sm font-bold text-gray-900 mt-1">
+              {product.price > 0 ? product.price.toLocaleString("ru") + " ₽" : "Цена по запросу"}
+            </p>
+          </div>
+        </div>
+        <button
+          disabled
+          className="w-full py-2.5 rounded-xl bg-gray-200 text-gray-400 text-sm font-medium cursor-not-allowed"
+        >
+          Заказать
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ProductCard({ product, visibleStoreIds }: { product: Product; visibleStoreIds: number[] | null }) {
   const { user } = useAuth();
   const { addToCart, items } = useCart();
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
+  const [orderModal, setOrderModal] = useState(false);
   const inCart = items.some((i) => i.product_id === String(product.id));
 
   // Фильтруем склады по настройкам видимости
@@ -147,18 +184,28 @@ function ProductCard({ product, visibleStoreIds }: { product: Product; visibleSt
             </span>
           )}
         </div>
-        <button
-          className={`mt-2 w-full text-sm font-medium py-2 rounded-xl transition-colors ${
-            inCart
-              ? "bg-green-500 hover:bg-green-600 text-white"
-              : "bg-[#e31e24] hover:bg-[#c41920] text-white"
-          }`}
-          onClick={handleAddToCart}
-          disabled={adding}
-        >
-          {adding ? "Добавляю..." : inCart ? "В корзине ✓" : (filteredStock || []).filter(s => s.quantity > 0).length > 1 ? "Выбрать склад →" : "В корзину"}
-        </button>
+        {isInStock ? (
+          <button
+            className={`mt-2 w-full text-sm font-medium py-2 rounded-xl transition-colors ${
+              inCart
+                ? "bg-green-500 hover:bg-green-600 text-white"
+                : "bg-[#e31e24] hover:bg-[#c41920] text-white"
+            }`}
+            onClick={handleAddToCart}
+            disabled={adding}
+          >
+            {adding ? "Добавляю..." : inCart ? "В корзине ✓" : (filteredStock || []).filter(s => s.quantity > 0).length > 1 ? "Выбрать склад →" : "В корзину"}
+          </button>
+        ) : (
+          <button
+            className="mt-2 w-full text-sm font-medium py-2 rounded-xl transition-colors bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200"
+            onClick={e => { e.preventDefault(); setOrderModal(true); }}
+          >
+            Заказать
+          </button>
+        )}
       </div>
+      {orderModal && <OrderModal product={product} onClose={() => setOrderModal(false)} />}
     </a>
   );
 }
@@ -226,7 +273,13 @@ export default function CatalogPage() {
         setProducts([]);
         setTotal(0);
       } else {
-        setProducts(data.items || []);
+        const items: Product[] = data.items || [];
+        items.sort((a, b) => {
+          const aInStock = a.stock_by_store?.some(s => s.quantity > 0) ? 1 : 0;
+          const bInStock = b.stock_by_store?.some(s => s.quantity > 0) ? 1 : 0;
+          return bInStock - aInStock;
+        });
+        setProducts(items);
         setTotal(data.total || 0);
         if (data.stores?.length) setStores(data.stores);
       }
