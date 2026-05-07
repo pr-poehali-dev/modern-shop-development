@@ -3,6 +3,7 @@ import json
 import urllib.request
 import urllib.error
 import urllib.parse
+# v3
 
 BASE_URL = "https://pm-71723.promaster.app"
 ALL_ITEMS_LIMIT = 500
@@ -12,7 +13,8 @@ def handler(event: dict, context) -> dict:
     """
     Прокси для ProMaster API — каталог товаров с остатками по складам.
     Фильтрация по группе выполняется на бэкенде, т.к. API игнорирует filter.
-    action=products — список товаров с остатками
+    action=products — список товаров с остатками по складам
+    action=product&id=N — один товар по ID
     action=categories — группы из товаров
     action=stores — список складов
     """
@@ -56,6 +58,9 @@ def handler(event: dict, context) -> dict:
         data = {"groups": result, "total": len(result)}
     elif action == "stores":
         data = fetch_stores(headers)
+    elif action == "product":
+        product_id = params.get("id", "")
+        data = fetch_product_by_id(headers, product_id)
     else:
         page = int(params.get("page", 1))
         per_page = int(params.get("per_page", 24))
@@ -291,4 +296,32 @@ def normalize_product(p, stores, all_stock):
         "description": p.get("description", ""),
         "in_stock": total_qty > 0,
         "stock_by_store": stock_by_store,
+        "images": [
+            (item.get("url") or item.get("src") or item) if isinstance(item, dict) else item
+            for item in p.get("images", [])
+            if (item.get("url") or item.get("src") or item) if isinstance(item, dict) else item
+        ],
     }
+
+
+def fetch_product_by_id(headers, product_id):
+    try:
+        stores_raw = fetch_url(f"{BASE_URL}/api/v1/store/getStores?limit=100", headers)
+        stores = [
+            {"id": s.get("id"), "name": s.get("name", ""), "main": s.get("main", False)}
+            for s in stores_raw.get("items", [])
+        ]
+        all_stock = fetch_all_stores_stock(headers, stores)
+
+        raw = fetch_url(f"{BASE_URL}/api/v1/store/getNomenclature?id={product_id}", headers)
+        item = raw.get("item") or raw
+        if not item or not item.get("id"):
+            # Fallback: поиск через список
+            all_items = fetch_all_pages(f"{BASE_URL}/api/v1/store/getNomenclatures?limit={ALL_ITEMS_LIMIT}", headers)
+            item = next((p for p in all_items if str(p.get("id")) == str(product_id)), None)
+        if not item:
+            return {"error": "Товар не найден"}
+        return normalize_product(item, stores, all_stock)
+    except Exception as e:
+        print(f"[product_by_id] error: {e}")
+        return {"error": str(e)}

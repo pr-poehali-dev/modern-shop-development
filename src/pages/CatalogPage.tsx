@@ -52,7 +52,7 @@ function ProductCard({ product }: { product: Product }) {
   const fallbackImg = `https://picsum.photos/seed/${product.id}/300/300`;
 
   return (
-    <div className="border border-[#e8e8e8] rounded-2xl overflow-hidden hover:border-[#e31e24] hover:shadow-md transition-all cursor-pointer group flex flex-col bg-white">
+    <a href={`/product/${product.id}`} className="border border-[#e8e8e8] rounded-2xl overflow-hidden hover:border-[#e31e24] hover:shadow-md transition-all cursor-pointer group flex flex-col bg-white no-underline">
       <div className="relative bg-[#f8f8f8] flex items-center justify-center" style={{ height: 180 }}>
         <img
           src={imgError || !product.image ? fallbackImg : product.image}
@@ -103,11 +103,14 @@ function ProductCard({ product }: { product: Product }) {
             </span>
           )}
         </div>
-        <button className="mt-2 w-full bg-[#e31e24] hover:bg-[#c41920] text-white text-sm font-medium py-2 rounded-xl transition-colors">
+        <button
+          className="mt-2 w-full bg-[#e31e24] hover:bg-[#c41920] text-white text-sm font-medium py-2 rounded-xl transition-colors"
+          onClick={(e) => e.preventDefault()}
+        >
           В корзину
         </button>
       </div>
-    </div>
+    </a>
   );
 }
 

@@ -11,6 +11,14 @@
       "method": "GET",
       "path": "/?action=categories",
       "expectedStatus": 200
+    },
+    {
+      "name": "Получение товара по ID",
+      "method": "GET",
+      "path": "/?action=product&id=3",
+      "expectedStatus": 200,
+      "expectedBody": {"id": 3},
+      "bodyMatcher": "partial"
     }
   ]
 }
