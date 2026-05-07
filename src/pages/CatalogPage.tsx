@@ -52,8 +52,8 @@ function ProductCard({ product }: { product: Product }) {
   const fallbackImg = `https://picsum.photos/seed/${product.id}/300/300`;
 
   return (
-    <div className="border border-[#e8e8e8] rounded-2xl overflow-hidden hover:border-[#e31e24] hover:shadow-md transition-all cursor-pointer group flex flex-col bg-white">
-      <div className="relative bg-[#f8f8f8] flex items-center justify-center" style={{ height: 180 }}>
+    <div className="border border-[#444] rounded-2xl overflow-hidden hover:border-[#e31e24] hover:shadow-md transition-all cursor-pointer group flex flex-col bg-[#3a3a3a]">
+      <div className="relative bg-[#2d2d2d] flex items-center justify-center" style={{ height: 180 }}>
         <img
           src={imgError || !product.image ? fallbackImg : product.image}
           alt={product.name}
@@ -87,14 +87,14 @@ function ProductCard({ product }: { product: Product }) {
         {product.sku && (
           <span className="text-[10px] text-gray-400">Арт. {product.sku}</span>
         )}
-        <p className="text-sm text-gray-800 leading-snug line-clamp-3 flex-1">
+        <p className="text-sm text-gray-200 leading-snug line-clamp-3 flex-1">
           {product.name}
         </p>
         {product.category_name && (
-          <span className="text-[10px] text-gray-400">{product.category_name}</span>
+          <span className="text-[10px] text-gray-500">{product.category_name}</span>
         )}
         <div className="flex items-baseline gap-2 mt-2">
-          <span className="text-lg font-bold text-gray-900">
+          <span className="text-lg font-bold text-white">
             {product.price > 0 ? product.price.toLocaleString("ru") + " ₽" : "Цена по запросу"}
           </span>
           {product.old_price && product.old_price > product.price && (
@@ -113,14 +113,14 @@ function ProductCard({ product }: { product: Product }) {
 
 function SkeletonCard() {
   return (
-    <div className="border border-[#e8e8e8] rounded-2xl overflow-hidden flex flex-col bg-white animate-pulse">
-      <div className="bg-gray-100" style={{ height: 180 }} />
+    <div className="border border-[#444] rounded-2xl overflow-hidden flex flex-col bg-[#3a3a3a] animate-pulse">
+      <div className="bg-[#2d2d2d]" style={{ height: 180 }} />
       <div className="p-3 flex flex-col gap-2">
-        <div className="h-3 bg-gray-100 rounded w-1/3" />
-        <div className="h-4 bg-gray-100 rounded w-full" />
-        <div className="h-4 bg-gray-100 rounded w-3/4" />
-        <div className="h-5 bg-gray-100 rounded w-1/2 mt-1" />
-        <div className="h-9 bg-gray-100 rounded-xl mt-1" />
+        <div className="h-3 bg-[#444] rounded w-1/3" />
+        <div className="h-4 bg-[#444] rounded w-full" />
+        <div className="h-4 bg-[#444] rounded w-3/4" />
+        <div className="h-5 bg-[#444] rounded w-1/2 mt-1" />
+        <div className="h-9 bg-[#444] rounded-xl mt-1" />
       </div>
     </div>
   );
