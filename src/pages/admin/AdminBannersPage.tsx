@@ -2,6 +2,96 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useAdminAuth, ADMIN_API_URL } from "@/admin/AdminAuth";
 import Icon from "@/components/ui/icon";
 
+// Мини-превью эффекта перехода
+function EffectPreview({ effect, image }: { effect: string; image?: string }) {
+  const [step, setStep] = useState<"a" | "b">("a");
+  const [animating, setAnimating] = useState(false);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      setAnimating(true);
+      setTimeout(() => {
+        setStep(s => s === "a" ? "b" : "a");
+        setAnimating(false);
+      }, 450);
+    }, 1800);
+    return () => clearInterval(t);
+  }, [effect]);
+
+  const colors = ["linear-gradient(135deg,#c8d8f0,#e0d0f8)", "linear-gradient(135deg,#cce4f0,#e8f4ff)"];
+  const labels = ["Слайд 1", "Слайд 2"];
+  const activeIdx = step === "a" ? 0 : 1;
+  const prevIdx = step === "a" ? 1 : 0;
+
+  const getStyle = (i: number): React.CSSProperties => {
+    const isActive = i === activeIdx;
+    const isPrev = i === prevIdx;
+    if (effect === "fade") {
+      if (isActive) return { opacity: animating ? 0 : 1, transform: "none", transition: animating ? "none" : "opacity 450ms ease", zIndex: 2 };
+      if (isPrev) return { opacity: animating ? 1 : 0, transform: "none", transition: "opacity 450ms ease", zIndex: 1 };
+      return { opacity: 0, zIndex: 0, transition: "none" };
+    }
+    if (effect === "zoom") {
+      if (isActive) return animating
+        ? { opacity: 0, transform: "scale(1.1)", transition: "none", zIndex: 2 }
+        : { opacity: 1, transform: "scale(1)", transition: "opacity 450ms, transform 450ms", zIndex: 2 };
+      if (isPrev) return animating
+        ? { opacity: 1, transform: "scale(1)", transition: "opacity 450ms, transform 450ms", zIndex: 1 }
+        : { opacity: 0, transform: "scale(0.92)", zIndex: 1, transition: "none" };
+      return { opacity: 0, zIndex: 0, transition: "none" };
+    }
+    if (effect === "flip") {
+      if (isActive) return animating
+        ? { opacity: 0, transform: "rotateY(90deg)", transition: "none", zIndex: 2 }
+        : { opacity: 1, transform: "rotateY(0deg)", transition: "opacity 400ms, transform 400ms", zIndex: 2 };
+      if (isPrev) return animating
+        ? { opacity: 1, transform: "rotateY(0deg)", transition: "opacity 400ms, transform 400ms", zIndex: 1 }
+        : { opacity: 0, transform: "rotateY(-90deg)", zIndex: 1, transition: "none" };
+      return { opacity: 0, zIndex: 0, transition: "none" };
+    }
+    if (effect === "slide-up") {
+      if (isActive) return animating
+        ? { transform: "translateY(40px)", opacity: 0, transition: "none", zIndex: 2 }
+        : { transform: "translateY(0)", opacity: 1, transition: "transform 450ms, opacity 450ms", zIndex: 2 };
+      if (isPrev) return animating
+        ? { transform: "translateY(-20px)", opacity: 0, transition: "transform 450ms, opacity 450ms", zIndex: 1 }
+        : { transform: "translateY(0)", opacity: 1, zIndex: 1, transition: "none" };
+      return { opacity: 0, zIndex: 0, transition: "none" };
+    }
+    // slide
+    if (isActive) return animating
+      ? { transform: "translateX(100%)", opacity: 0, transition: "none", zIndex: 2 }
+      : { transform: "translateX(0)", opacity: 1, transition: "transform 420ms cubic-bezier(0.25,0.46,0.45,0.94), opacity 420ms", zIndex: 2 };
+    if (isPrev) return animating
+      ? { transform: "translateX(-30%)", opacity: 0, transition: "transform 420ms cubic-bezier(0.25,0.46,0.45,0.94), opacity 420ms", zIndex: 1 }
+      : { transform: "translateX(0)", opacity: 1, zIndex: 1, transition: "none" };
+    return { transform: "translateX(100%)", opacity: 0, zIndex: 0, transition: "none" };
+  };
+
+  return (
+    <div className="relative rounded-xl overflow-hidden bg-gray-100 flex-shrink-0" style={{ width: 160, height: 80, perspective: "800px" }}>
+      {[0, 1].map(i => (
+        <div
+          key={i}
+          className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-gray-600"
+          style={{ background: colors[i], ...getStyle(i) }}
+        >
+          {image && i === activeIdx ? (
+            <img src={image} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <span>{labels[i]}</span>
+          )}
+        </div>
+      ))}
+      <div className="absolute bottom-1.5 right-2 z-10 flex gap-1">
+        {[0, 1].map(i => (
+          <div key={i} className={`rounded-full transition-all ${i === activeIdx ? "w-3 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/50"}`} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 interface Banner {
   id: number;
   title: string;
@@ -329,6 +419,18 @@ export default function AdminBannersPage() {
                   >
                     {EFFECTS.map(ef => <option key={ef.value} value={ef.value}>{ef.label}</option>)}
                   </select>
+                </div>
+              </div>
+
+              {/* Effect preview */}
+              <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
+                <EffectPreview key={modal.effect} effect={modal.effect ?? "slide"} image={imagePreview || undefined} />
+                <div>
+                  <p className="text-xs font-medium text-gray-700 mb-0.5">Предпросмотр эффекта</p>
+                  <p className="text-[11px] text-gray-400 leading-relaxed">
+                    {EFFECTS.find(e => e.value === modal.effect)?.label ?? "Слайд"}<br/>
+                    Анимация воспроизводится автоматически
+                  </p>
                 </div>
               </div>
 
