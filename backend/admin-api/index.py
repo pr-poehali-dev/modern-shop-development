@@ -387,6 +387,8 @@ def handler(event: dict, context) -> dict:
     # Публичные маршруты
     if action == 'login' and method == 'POST':
         return handle_login(body)
+    if action == 'banners' and method == 'GET':
+        return handle_banners('GET', {}, params)
 
     # Защищённые маршруты
     user = verify_token(headers)
