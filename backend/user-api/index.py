@@ -7,8 +7,11 @@
 import json
 import os
 import random
+import urllib.request
 import psycopg2
 from datetime import datetime
+
+CATALOG_API_URL = "https://functions.poehali.dev/c7265605-961b-48cb-9594-4caad2cb333e"
 
 CORS_HEADERS = {
     'Access-Control-Allow-Origin': '*',
@@ -186,6 +189,23 @@ def handle_cart_clear(conn, user_id: int) -> dict:
     return ok({'ok': True})
 
 
+def fetch_live_stock(product_id: str, store_id: int) -> int | None:
+    """Запрашивает актуальный остаток товара на конкретном складе через каталог ProMaster."""
+    try:
+        url = f"{CATALOG_API_URL}?action=products&search={urllib.request.quote(str(product_id))}&per_page=50"
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+        for product in (data.get('items') or []):
+            if str(product.get('id')) == str(product_id) or str(product.get('sku', '')) == str(product_id):
+                for s in (product.get('stock_by_store') or []):
+                    if s.get('store_id') == store_id:
+                        return int(s.get('quantity', 0))
+    except Exception:
+        pass
+    return None
+
+
 # --- ORDERS ---
 
 def handle_order_create(conn, user_id: int, body: dict) -> dict:
@@ -214,27 +234,48 @@ def handle_order_create(conn, user_id: int, body: dict) -> dict:
     if not rows:
         return err('Корзина пуста')
 
-    # Проверяем доступное количество по каждому товару
+    # Проверяем актуальное наличие в ProMaster + сохранённый max_quantity
     stock_errors = []
     items = []
     total_price = 0.0
     for r in rows:
         price = float(r[4]) if r[4] else 0.0
         qty = int(r[8])
+        product_id = r[2]
+        product_sku = r[6]
+        store_id = r[9]
         max_qty = r[11]
-        if max_qty is not None and qty > max_qty:
-            stock_errors.append(
-                f'«{r[3]}»: заказано {qty} шт., доступно {max_qty} шт.'
-            )
+
+        # Запрашиваем актуальный остаток (по SKU или product_id)
+        if store_id is not None:
+            live_qty = fetch_live_stock(product_sku or product_id, store_id)
+            if live_qty is not None:
+                if qty > live_qty:
+                    if live_qty == 0:
+                        stock_errors.append(f'«{r[3]}»: товар закончился на складе')
+                    else:
+                        stock_errors.append(f'«{r[3]}»: заказано {qty} шт., доступно {live_qty} шт.')
+                # Обновляем max_quantity в БД актуальным значением
+                cur.execute(
+                    f"UPDATE cart_items SET max_quantity = {live_qty} "
+                    f"WHERE user_id = {user_id} AND product_id = '{escape(product_id)}'"
+                )
+            elif max_qty is not None and qty > max_qty:
+                # Если ProMaster недоступен — используем сохранённый лимит
+                stock_errors.append(f'«{r[3]}»: заказано {qty} шт., доступно {max_qty} шт.')
+        elif max_qty is not None and qty > max_qty:
+            stock_errors.append(f'«{r[3]}»: заказано {qty} шт., доступно {max_qty} шт.')
+
         total_price += price * qty
         items.append({
-            'product_id': r[2], 'product_name': r[3],
+            'product_id': product_id, 'product_name': r[3],
             'product_price': price, 'product_image': r[5],
-            'product_sku': r[6], 'product_unit': r[7], 'quantity': qty,
-            'store_id': r[9], 'store_name': r[10],
+            'product_sku': product_sku, 'product_unit': r[7], 'quantity': qty,
+            'store_id': store_id, 'store_name': r[10],
         })
 
     if stock_errors:
+        conn.rollback()
         return err('Недостаточно товара на складе: ' + '; '.join(stock_errors))
 
     if delivery_type == 'delivery' and total_price < 1000:
