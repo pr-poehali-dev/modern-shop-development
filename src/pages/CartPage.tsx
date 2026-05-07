@@ -1,3 +1,4 @@
+import { useState } from "react";
 import ServiceclickHeader from "@/components/ServiceclickHeader";
 import ServiceclickNav from "@/components/ServiceclickNav";
 import ServiceclickFooter from "@/components/ServiceclickFooter";
@@ -10,6 +11,17 @@ export default function CartPage() {
   const { user } = useAuth();
   const { items, count, total, loading, updateQuantity, removeItem, clearCart, cartStoreName } = useCart();
   const navigate = useNavigate();
+  const [qtyErrors, setQtyErrors] = useState<Record<string, string>>({});
+
+  const handleQtyChange = async (product_id: string, newQty: number) => {
+    const result = await updateQuantity(product_id, newQty);
+    if (!result.ok && result.error) {
+      setQtyErrors(prev => ({ ...prev, [product_id]: result.error! }));
+      setTimeout(() => setQtyErrors(prev => { const next = { ...prev }; delete next[product_id]; return next; }), 3000);
+    } else {
+      setQtyErrors(prev => { const next = { ...prev }; delete next[product_id]; return next; });
+    }
+  };
 
   if (!user) {
     return (
@@ -62,7 +74,7 @@ export default function CartPage() {
           {cartStoreName && (
             <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-4 text-sm text-blue-700">
               <Icon name="Info" size={15} className="flex-shrink-0" />
-              Все товары в корзине заказываются со склада <b>{cartStoreName}</b>. Чтобы добавить товар с другого склада — очистите корзину.
+              Все товары заказываются со склада <b className="mx-1">{cartStoreName}</b>. Чтобы добавить товар с другого склада — очистите корзину.
             </div>
           )}
 
@@ -86,56 +98,78 @@ export default function CartPage() {
             <div className="flex gap-6 flex-col lg:flex-row">
               {/* Items */}
               <div className="flex-1 flex flex-col gap-3">
-                {items.map((item) => (
-                  <div key={item.id} className="bg-white rounded-2xl p-4 flex gap-4 items-center">
-                    <a href={`/product/${item.product_id}`} className="w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden bg-[#f8f8f8]">
-                      <img
-                        src={item.product_image || `https://picsum.photos/seed/${item.product_id}/80/80`}
-                        alt={item.product_name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${item.product_id}/80/80`; }}
-                      />
-                    </a>
-                    <div className="flex-1 min-w-0">
-                      <a href={`/product/${item.product_id}`} className="text-sm font-medium text-gray-800 line-clamp-2 hover:text-[#e31e24] transition-colors">
-                        {item.product_name}
+                {items.map((item) => {
+                  const atMax = item.max_quantity !== null && item.quantity >= item.max_quantity;
+                  const qtyError = qtyErrors[item.product_id];
+                  return (
+                    <div key={item.id} className="bg-white rounded-2xl p-4 flex gap-4 items-center">
+                      <a href={`/product/${item.product_id}`} className="w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden bg-[#f8f8f8]">
+                        <img
+                          src={item.product_image || `https://picsum.photos/seed/${item.product_id}/80/80`}
+                          alt={item.product_name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${item.product_id}/80/80`; }}
+                        />
                       </a>
-                      {item.product_sku && (
-                        <p className="text-xs text-gray-400 mt-0.5">Арт. {item.product_sku}</p>
-                      )}
-                      {item.store_name && (
-                        <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-                          <Icon name="Warehouse" size={11} />
-                          {item.store_name}
-                        </p>
-                      )}
-                      <p className="text-base font-bold text-gray-900 mt-1">
-                        {(item.product_price * item.quantity).toLocaleString("ru")} ₽
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex-1 min-w-0">
+                        <a href={`/product/${item.product_id}`} className="text-sm font-medium text-gray-800 line-clamp-2 hover:text-[#e31e24] transition-colors">
+                          {item.product_name}
+                        </a>
+                        {item.product_sku && (
+                          <p className="text-xs text-gray-400 mt-0.5">Арт. {item.product_sku}</p>
+                        )}
+                        {item.store_name && (
+                          <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                            <Icon name="Warehouse" size={11} />
+                            {item.store_name}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <p className="text-base font-bold text-gray-900">
+                            {(item.product_price * item.quantity).toLocaleString("ru")} ₽
+                          </p>
+                          {item.max_quantity !== null && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${atMax ? "bg-orange-100 text-orange-600" : "bg-gray-100 text-gray-500"}`}>
+                              {atMax ? `Максимум ${item.max_quantity} шт.` : `Доступно: ${item.max_quantity} шт.`}
+                            </span>
+                          )}
+                        </div>
+                        {qtyError && (
+                          <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                            <Icon name="AlertCircle" size={11} />
+                            {qtyError}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => handleQtyChange(item.product_id, item.quantity - 1)}
+                          className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:border-[#e31e24] hover:text-[#e31e24] transition-colors"
+                        >
+                          <Icon name="Minus" size={14} />
+                        </button>
+                        <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                        <button
+                          onClick={() => handleQtyChange(item.product_id, item.quantity + 1)}
+                          disabled={atMax}
+                          className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-colors ${
+                            atMax
+                              ? "border-gray-100 text-gray-300 cursor-not-allowed"
+                              : "border-gray-200 hover:border-[#e31e24] hover:text-[#e31e24]"
+                          }`}
+                        >
+                          <Icon name="Plus" size={14} />
+                        </button>
+                      </div>
                       <button
-                        onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
-                        className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:border-[#e31e24] hover:text-[#e31e24] transition-colors"
+                        onClick={() => removeItem(item.product_id)}
+                        className="ml-2 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
                       >
-                        <Icon name="Minus" size={14} />
-                      </button>
-                      <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                      <button
-                        onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
-                        className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:border-[#e31e24] hover:text-[#e31e24] transition-colors"
-                      >
-                        <Icon name="Plus" size={14} />
+                        <Icon name="X" size={18} />
                       </button>
                     </div>
-                    <button
-                      onClick={() => removeItem(item.product_id)}
-                      className="ml-2 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
-                    >
-                      <Icon name="X" size={18} />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
 
                 <button
                   onClick={() => clearCart()}

@@ -64,6 +64,7 @@ def row_to_item(row) -> dict:
         'quantity': row[8],
         'store_id': row[9],
         'store_name': row[10],
+        'max_quantity': row[11],
     }
 
 
@@ -73,7 +74,7 @@ def handle_cart_get(conn, user_id: int) -> dict:
     cur = conn.cursor()
     cur.execute(
         f"SELECT id, user_id, product_id, product_name, product_price, "
-        f"product_image, product_sku, product_unit, quantity, store_id, store_name "
+        f"product_image, product_sku, product_unit, quantity, store_id, store_name, max_quantity "
         f"FROM cart_items WHERE user_id = {user_id} AND quantity > 0 ORDER BY created_at"
     )
     return ok({'items': [row_to_item(r) for r in cur.fetchall()]})
@@ -85,34 +86,41 @@ def handle_cart_add(conn, user_id: int, body: dict) -> dict:
     product_image = str(body.get('product_image', '') or '')
     product_sku = str(body.get('product_sku', '') or '')
     product_unit = str(body.get('product_unit', '') or 'шт')
-    quantity = int(body.get('quantity', 1))
     store_id_raw = body.get('store_id')
     store_id = int(store_id_raw) if store_id_raw is not None else None
     store_name = str(body.get('store_name', '') or '')
+    max_qty_raw = body.get('max_quantity')
+    max_quantity = int(max_qty_raw) if max_qty_raw is not None else None
+
     if not product_id:
         return err('Поле product_id обязательно')
-    if quantity < 1:
-        quantity = 1
     try:
         product_price = float(body.get('product_price', 0))
     except (TypeError, ValueError):
         product_price = 0.0
 
+    # Нельзя добавить 0 в наличии
+    if max_quantity is not None and max_quantity <= 0:
+        return err('Товар отсутствует на складе')
+
+    quantity = 1
+
     sid_sql = str(store_id) if store_id is not None else 'NULL'
     sname_sql = f"'{escape(store_name)}'" if store_name else 'NULL'
+    mq_sql = str(max_quantity) if max_quantity is not None else 'NULL'
 
     cur = conn.cursor()
     cur.execute(
         f"INSERT INTO cart_items "
-        f"(user_id, product_id, product_name, product_price, product_image, product_sku, product_unit, quantity, store_id, store_name) "
+        f"(user_id, product_id, product_name, product_price, product_image, product_sku, product_unit, quantity, store_id, store_name, max_quantity) "
         f"VALUES ({user_id}, '{escape(product_id)}', '{escape(product_name)}', {product_price}, "
-        f"'{escape(product_image)}', '{escape(product_sku)}', '{escape(product_unit)}', {quantity}, {sid_sql}, {sname_sql}) "
+        f"'{escape(product_image)}', '{escape(product_sku)}', '{escape(product_unit)}', {quantity}, {sid_sql}, {sname_sql}, {mq_sql}) "
         f"ON CONFLICT (user_id, product_id) DO UPDATE SET "
-        f"quantity = CASE WHEN cart_items.quantity < 0 THEN EXCLUDED.quantity ELSE cart_items.quantity + EXCLUDED.quantity END, "
+        f"quantity = CASE WHEN cart_items.quantity < 0 THEN {quantity} ELSE LEAST(cart_items.quantity + {quantity}, COALESCE(EXCLUDED.max_quantity, cart_items.quantity + {quantity})) END, "
         f"product_name = EXCLUDED.product_name, product_price = EXCLUDED.product_price, "
         f"product_image = EXCLUDED.product_image, product_sku = EXCLUDED.product_sku, product_unit = EXCLUDED.product_unit, "
-        f"store_id = EXCLUDED.store_id, store_name = EXCLUDED.store_name "
-        f"RETURNING id, user_id, product_id, product_name, product_price, product_image, product_sku, product_unit, quantity, store_id, store_name"
+        f"store_id = EXCLUDED.store_id, store_name = EXCLUDED.store_name, max_quantity = EXCLUDED.max_quantity "
+        f"RETURNING id, user_id, product_id, product_name, product_price, product_image, product_sku, product_unit, quantity, store_id, store_name, max_quantity"
     )
     row = cur.fetchone()
     conn.commit()
@@ -128,10 +136,30 @@ def handle_cart_update(conn, user_id: int, body: dict) -> dict:
         quantity = int(quantity)
     except (TypeError, ValueError):
         return err('quantity должен быть числом')
-    new_qty = -1 if quantity <= 0 else quantity
+
+    if quantity <= 0:
+        cur = conn.cursor()
+        cur.execute(
+            f"UPDATE cart_items SET quantity = -1 "
+            f"WHERE user_id = {user_id} AND product_id = '{escape(product_id)}'"
+        )
+        conn.commit()
+        return ok({'ok': True})
+
+    # Ограничиваем по max_quantity из БД
     cur = conn.cursor()
     cur.execute(
-        f"UPDATE cart_items SET quantity = {new_qty} "
+        f"SELECT max_quantity FROM cart_items "
+        f"WHERE user_id = {user_id} AND product_id = '{escape(product_id)}'"
+    )
+    row = cur.fetchone()
+    max_quantity = row[0] if row and row[0] is not None else None
+
+    if max_quantity is not None and quantity > max_quantity:
+        return err(f'Доступно только {max_quantity} шт. на выбранном складе', 400)
+
+    cur.execute(
+        f"UPDATE cart_items SET quantity = {quantity} "
         f"WHERE user_id = {user_id} AND product_id = '{escape(product_id)}'"
     )
     conn.commit()
@@ -179,24 +207,35 @@ def handle_order_create(conn, user_id: int, body: dict) -> dict:
     cur = conn.cursor()
     cur.execute(
         f"SELECT id, user_id, product_id, product_name, product_price, "
-        f"product_image, product_sku, product_unit, quantity "
+        f"product_image, product_sku, product_unit, quantity, store_id, store_name, max_quantity "
         f"FROM cart_items WHERE user_id = {user_id} AND quantity > 0 ORDER BY created_at"
     )
     rows = cur.fetchall()
     if not rows:
         return err('Корзина пуста')
 
+    # Проверяем доступное количество по каждому товару
+    stock_errors = []
     items = []
     total_price = 0.0
     for r in rows:
         price = float(r[4]) if r[4] else 0.0
         qty = int(r[8])
+        max_qty = r[11]
+        if max_qty is not None and qty > max_qty:
+            stock_errors.append(
+                f'«{r[3]}»: заказано {qty} шт., доступно {max_qty} шт.'
+            )
         total_price += price * qty
         items.append({
             'product_id': r[2], 'product_name': r[3],
             'product_price': price, 'product_image': r[5],
             'product_sku': r[6], 'product_unit': r[7], 'quantity': qty,
+            'store_id': r[9], 'store_name': r[10],
         })
+
+    if stock_errors:
+        return err('Недостаточно товара на складе: ' + '; '.join(stock_errors))
 
     if delivery_type == 'delivery' and total_price < 1000:
         return err('Минимальная сумма заказа для доставки — 1000 ₽')

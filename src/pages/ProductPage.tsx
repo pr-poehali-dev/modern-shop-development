@@ -381,6 +381,7 @@ export default function ProductPage() {
                           image: product.image, sku: product.sku, unit: product.unit,
                           store_id: selectedStoreId,
                           store_name: selectedStore?.store_name || null,
+                          max_quantity: selectedStore?.quantity ?? null,
                         });
                         if (!result.ok && result.conflictStore) {
                           setConflictMsg(result.conflictStore);

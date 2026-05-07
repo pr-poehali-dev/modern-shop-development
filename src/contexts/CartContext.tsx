@@ -14,6 +14,7 @@ export interface CartItem {
   quantity: number;
   store_id: number | null;
   store_name: string | null;
+  max_quantity: number | null;
 }
 
 interface CartContextType {
@@ -32,8 +33,9 @@ interface CartContextType {
     unit: string;
     store_id?: number | null;
     store_name?: string | null;
+    max_quantity?: number | null;
   }) => Promise<{ ok: boolean; conflictStore?: string }>;
-  updateQuantity: (product_id: string, quantity: number) => Promise<void>;
+  updateQuantity: (product_id: string, quantity: number) => Promise<{ ok: boolean; error?: string }>;
   removeItem: (product_id: string) => Promise<void>;
   clearCart: () => Promise<void>;
   reload: () => Promise<void>;
@@ -74,7 +76,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     reload();
   }, [user, reload]);
 
-  // Текущий склад корзины — берём из первого товара
   const cartStoreId = items.length > 0 ? (items[0].store_id ?? null) : null;
   const cartStoreName = items.length > 0 ? (items[0].store_name ?? null) : null;
 
@@ -82,10 +83,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     id: string | number; name: string; price: number;
     image: string; sku: string; unit: string;
     store_id?: number | null; store_name?: string | null;
+    max_quantity?: number | null;
   }): Promise<{ ok: boolean; conflictStore?: string }> => {
     const incomingStoreId = product.store_id ?? null;
 
-    // Проверяем конфликт склада
     if (items.length > 0 && cartStoreId !== null && incomingStoreId !== null && cartStoreId !== incomingStoreId) {
       return { ok: false, conflictStore: cartStoreName || `Склад #${cartStoreId}` };
     }
@@ -98,9 +99,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       product_image: product.image || "",
       product_sku: product.sku || "",
       product_unit: product.unit || "шт",
-      quantity: 1,
       store_id: incomingStoreId,
       store_name: product.store_name || null,
+      max_quantity: product.max_quantity ?? null,
     });
     if (data?.item) {
       setItems((prev) => {
@@ -116,8 +117,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   };
 
-  const updateQuantity = async (product_id: string, quantity: number) => {
-    await call({ action: "cart.update", product_id, quantity });
+  const updateQuantity = async (product_id: string, quantity: number): Promise<{ ok: boolean; error?: string }> => {
+    // Клиентская проверка до запроса на бэкенд
+    if (quantity > 0) {
+      const item = items.find(i => i.product_id === product_id);
+      if (item?.max_quantity !== null && item?.max_quantity !== undefined && quantity > item.max_quantity) {
+        return { ok: false, error: `Доступно только ${item.max_quantity} шт.` };
+      }
+    }
+
+    const data = await call({ action: "cart.update", product_id, quantity });
+
+    if (data?.error) {
+      return { ok: false, error: data.error };
+    }
+
     if (quantity <= 0) {
       setItems((prev) => prev.filter((i) => i.product_id !== product_id));
     } else {
@@ -125,6 +139,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         prev.map((i) => (i.product_id === product_id ? { ...i, quantity } : i))
       );
     }
+    return { ok: true };
   };
 
   const removeItem = async (product_id: string) => {
