@@ -110,7 +110,7 @@ function getSlideStyle(
 }
 
 export default function ServiceclickHero() {
-  const [slides, setSlides] = useState<SlideData[]>(FALLBACK_SLIDES);
+  const [slides, setSlides] = useState<SlideData[]>([]);
   const [current, setCurrent] = useState(0);
   const [prev, setPrev] = useState<number | null>(null);
   const [direction, setDirection] = useState<"next" | "prev">("next");
