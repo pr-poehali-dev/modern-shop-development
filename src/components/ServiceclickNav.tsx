@@ -101,7 +101,7 @@ export default function ServiceclickNav() {
       {/* Side panel */}
       <div
         ref={panelRef}
-        className={`fixed top-0 left-0 h-full z-50 bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 left-0 h-full z-50 bg-[#2d2d2d] shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
         style={{ width: 280 }}
@@ -123,7 +123,7 @@ export default function ServiceclickNav() {
         {/* "All catalog" link */}
         <button
           onClick={() => { setOpen(false); navigate("/catalog"); }}
-          className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-[#e31e24] hover:bg-[#fff0f0] border-b border-[#f0f0f0] transition-colors text-left"
+          className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-[#e31e24] hover:bg-[#3a3a3a] border-b border-[#444] transition-colors text-left"
         >
           <Icon name="List" size={15} />
           Все товары
@@ -134,7 +134,7 @@ export default function ServiceclickNav() {
           {loading && (
             <div className="flex flex-col gap-1 p-3">
               {Array.from({ length: 10 }).map((_, i) => (
-                <div key={i} className="h-8 bg-gray-100 rounded animate-pulse" />
+                <div key={i} className="h-8 bg-[#3a3a3a] rounded animate-pulse" />
               ))}
             </div>
           )}
@@ -147,11 +147,11 @@ export default function ServiceclickNav() {
             <button
               key={cat.id}
               onClick={() => handleCategoryClick(cat)}
-              className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-700 hover:bg-[#fff0f0] hover:text-[#e31e24] transition-colors border-b border-[#f5f5f5] text-left"
+              className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-[#3a3a3a] hover:text-[#e31e24] transition-colors border-b border-[#444] text-left"
             >
               <span className="truncate">{cat.name}</span>
               {cat.count > 0 && (
-                <span className="text-[10px] text-gray-400 ml-2 flex-shrink-0">{cat.count}</span>
+                <span className="text-[10px] text-gray-500 ml-2 flex-shrink-0">{cat.count}</span>
               )}
             </button>
           ))}
