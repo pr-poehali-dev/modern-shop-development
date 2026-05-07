@@ -524,16 +524,37 @@ export default function CatalogPage() {
           )}
         </div>
 
-        {/* Title + search */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
-          <h1 className="text-2xl font-bold text-gray-900 flex-1">
-            {selectedCategory ? selectedCategory.name : "Каталог товаров"}
-            {displayTotal > 0 && !isLoading && (
-              <span className="ml-2 text-base text-gray-400 font-normal">
-                {displayTotal.toLocaleString("ru")} товаров
-              </span>
+        {/* Title + search + in-stock toggle */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            <h1 className="text-2xl font-bold text-gray-900 whitespace-nowrap">
+              {selectedCategory ? selectedCategory.name : "Каталог товаров"}
+              {displayTotal > 0 && !isLoading && (
+                <span className="ml-2 text-base text-gray-400 font-normal">
+                  {displayTotal.toLocaleString("ru")}
+                </span>
+              )}
+            </h1>
+            {/* In-stock toggle */}
+            <label className="flex items-center gap-2 cursor-pointer select-none group" onClick={toggleInStock}>
+            <span className={`w-4 h-4 rounded flex items-center justify-center border transition-all flex-shrink-0 ${
+              inStockOnly ? "bg-green-600 border-green-600" : "bg-white border-gray-300 group-hover:border-green-500"
+            }`}>
+              {inStockOnly && (
+                <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                  <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </span>
+            <span className={`text-sm font-medium transition-colors ${inStockOnly ? "text-green-700" : "text-gray-600 group-hover:text-green-600"}`}>
+              В наличии
+            </span>
+            {inStockOnly && allInStockProducts !== null && (
+              <span className="text-xs text-green-600 font-medium">{allInStockProducts.length}</span>
             )}
-          </h1>
+            {inStockLoading && <span className="w-3.5 h-3.5 rounded-full border-2 border-green-200 border-t-green-600 animate-spin inline-block" />}
+            </label>
+          </div>
           <form onSubmit={handleSearch} className="flex gap-2 w-full sm:w-80">
             <div className="relative flex-1">
               <Icon name="Search" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -552,30 +573,6 @@ export default function CatalogPage() {
               Найти
             </button>
           </form>
-        </div>
-
-
-
-        {/* In-stock toggle */}
-        <div className="flex items-center gap-2 mb-4">
-          <label className="flex items-center gap-2 cursor-pointer select-none group" onClick={toggleInStock}>
-            <span className={`w-4 h-4 rounded flex items-center justify-center border transition-all flex-shrink-0 ${
-              inStockOnly ? "bg-green-600 border-green-600" : "bg-white border-gray-300 group-hover:border-green-500"
-            }`}>
-              {inStockOnly && (
-                <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                  <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              )}
-            </span>
-            <span className={`text-sm font-medium transition-colors ${inStockOnly ? "text-green-700" : "text-gray-600 group-hover:text-green-600"}`}>
-              В наличии
-            </span>
-            {inStockOnly && allInStockProducts !== null && (
-              <span className="text-xs text-green-600 font-medium">{allInStockProducts.length}</span>
-            )}
-            {inStockLoading && <span className="w-3.5 h-3.5 rounded-full border-2 border-green-200 border-t-green-600 animate-spin inline-block" />}
-          </label>
         </div>
 
         {/* Active search badge */}
