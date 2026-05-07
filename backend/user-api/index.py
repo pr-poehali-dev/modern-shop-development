@@ -189,20 +189,53 @@ def handle_cart_clear(conn, user_id: int) -> dict:
     return ok({'ok': True})
 
 
-def fetch_live_stock(product_id: str, store_id: int) -> int | None:
-    """Запрашивает актуальный остаток товара на конкретном складе через каталог ProMaster."""
+def fetch_product_data(search_term: str) -> dict | None:
+    """Загружает данные товара из каталога ProMaster по SKU или ID."""
     try:
-        url = f"{CATALOG_API_URL}?action=products&search={urllib.request.quote(str(product_id))}&per_page=50"
+        url = f"{CATALOG_API_URL}?action=products&search={urllib.request.quote(str(search_term))}&per_page=50"
         req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            raw = resp.read().decode('utf-8')
+        envelope = json.loads(raw)
+        # Каталог оборачивает ответ в {statusCode, body: "...json..."}
+        if isinstance(envelope.get('body'), str):
+            data = json.loads(envelope['body'])
+        else:
+            data = envelope
+        return data
+    except Exception as e:
+        print(f"[stock_check] fetch ERROR: {e}")
+    return None
+
+
+def fetch_live_stock(product_id: str, product_sku: str, store_id: int | None) -> int | None:
+    """Возвращает актуальный остаток товара. Если store_id=None — суммарный по всем складам."""
+    # Ищем сначала по SKU (точнее), потом по product_id
+    for search_term in list(dict.fromkeys([product_sku, product_id])):
+        if not search_term:
+            continue
+        data = fetch_product_data(search_term)
+        if not data:
+            continue
         for product in (data.get('items') or []):
-            if str(product.get('id')) == str(product_id) or str(product.get('sku', '')) == str(product_id):
-                for s in (product.get('stock_by_store') or []):
-                    if s.get('store_id') == store_id:
-                        return int(s.get('quantity', 0))
-    except Exception:
-        pass
+            pid = str(product.get('id', ''))
+            psku = str(product.get('sku', ''))
+            if pid == str(product_id) or psku == str(product_sku) or pid == str(product_sku) or psku == str(product_id):
+                stock_list = product.get('stock_by_store') or []
+                if store_id is not None:
+                    for s in stock_list:
+                        if int(s.get('store_id', -1)) == int(store_id):
+                            qty = int(s.get('quantity', 0))
+                            print(f"[stock_check] id={product_id} sku={product_sku} store={store_id} qty={qty}")
+                            return qty
+                    print(f"[stock_check] store_id={store_id} not found, returning 0")
+                    return 0
+                else:
+                    # Нет склада — суммируем по всем
+                    total = sum(int(s.get('quantity', 0)) for s in stock_list)
+                    print(f"[stock_check] id={product_id} no store, total_qty={total}")
+                    return total
+        print(f"[stock_check] product not found for search={search_term}")
     return None
 
 
@@ -246,24 +279,21 @@ def handle_order_create(conn, user_id: int, body: dict) -> dict:
         store_id = r[9]
         max_qty = r[11]
 
-        # Запрашиваем актуальный остаток (по SKU или product_id)
-        if store_id is not None:
-            live_qty = fetch_live_stock(product_sku or product_id, store_id)
-            if live_qty is not None:
-                if qty > live_qty:
-                    if live_qty == 0:
-                        stock_errors.append(f'«{r[3]}»: товар закончился на складе')
-                    else:
-                        stock_errors.append(f'«{r[3]}»: заказано {qty} шт., доступно {live_qty} шт.')
-                # Обновляем max_quantity в БД актуальным значением
-                cur.execute(
-                    f"UPDATE cart_items SET max_quantity = {live_qty} "
-                    f"WHERE user_id = {user_id} AND product_id = '{escape(product_id)}'"
-                )
-            elif max_qty is not None and qty > max_qty:
-                # Если ProMaster недоступен — используем сохранённый лимит
-                stock_errors.append(f'«{r[3]}»: заказано {qty} шт., доступно {max_qty} шт.')
+        # Запрашиваем актуальный остаток из ProMaster
+        live_qty = fetch_live_stock(product_id, product_sku, store_id)
+        if live_qty is not None:
+            if qty > live_qty:
+                if live_qty == 0:
+                    stock_errors.append(f'«{r[3]}»: товар закончился на складе')
+                else:
+                    stock_errors.append(f'«{r[3]}»: заказано {qty} шт., доступно {live_qty} шт.')
+            # Обновляем max_quantity в БД актуальным значением
+            cur.execute(
+                f"UPDATE cart_items SET max_quantity = {live_qty} "
+                f"WHERE user_id = {user_id} AND product_id = '{escape(product_id)}'"
+            )
         elif max_qty is not None and qty > max_qty:
+            # Если ProMaster недоступен — используем сохранённый лимит
             stock_errors.append(f'«{r[3]}»: заказано {qty} шт., доступно {max_qty} шт.')
 
         total_price += price * qty
