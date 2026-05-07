@@ -257,7 +257,7 @@ export default function ServiceclickHero() {
         ))}
 
         {/* Counter + arrows — rendered after slides so natural stacking order wins */}
-        {TOTAL > 1 && (
+        {TOTAL >= 1 && (
           <div className="absolute bottom-4 right-4 flex flex-col items-center gap-1.5" style={{ zIndex: 100 }}>
             <div className="flex items-center gap-2">
               <button onClick={handlePrev} className="w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center shadow-lg backdrop-blur-sm transition-colors">
@@ -281,7 +281,7 @@ export default function ServiceclickHero() {
         )}
 
         {/* Dots */}
-        {TOTAL > 1 && (
+        {TOTAL >= 1 && (
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5" style={{ zIndex: 100 }}>
             {slides.map((_, i) => (
               <button
