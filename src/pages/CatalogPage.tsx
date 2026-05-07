@@ -265,32 +265,7 @@ export default function CatalogPage() {
           </form>
         </div>
 
-        {/* Categories */}
-        {!catLoading && categories.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
-            <button
-              onClick={() => setFilter("category", "")}
-              className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                !categoryId ? "bg-[#e31e24] text-white border-[#e31e24]" : "border-[#e8e8e8] bg-white text-gray-700"
-              }`}
-            >
-              Все
-            </button>
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setFilter("category", String(cat.id))}
-                className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                  String(cat.id) === categoryId
-                    ? "bg-[#e31e24] text-white border-[#e31e24]"
-                    : "border-[#e8e8e8] bg-white text-gray-700"
-                }`}
-              >
-                {cat.name}
-              </button>
-            ))}
-          </div>
-        )}
+
 
         {/* Склады */}
         {stores.length > 0 && (
