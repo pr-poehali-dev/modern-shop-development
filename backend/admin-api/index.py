@@ -409,16 +409,28 @@ def handle_settings(method, body):
 
 # --- PROMASTER STORES ---
 def handle_promaster_stores():
-    """Возвращает список складов из ProMaster API"""
-    token = os.environ.get('PROMASTER_API_TOKEN', '')
-    base_url = "https://pm-71723.promaster.app"
-    req = urllib.request.Request(
-        f"{base_url}/api/v1/store/getStores?limit=100",
-        headers={'Authorization': token}
-    )
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        data = json.loads(resp.read().decode('utf-8'))
-    stores = [{'id': s.get('id'), 'name': s.get('name', ''), 'main': s.get('main', False)} for s in (data.get('items') or [])]
+    """Возвращает список складов из ProMaster API; fallback — из location_stores в БД"""
+    try:
+        token = os.environ.get('PROMASTER_API_TOKEN', '')
+        base_url = "https://pm-71723.promaster.app"
+        req = urllib.request.Request(
+            f"{base_url}/api/v1/store/getStores?limit=100",
+            headers={'Authorization': token}
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+        stores = [{'id': s.get('id'), 'name': s.get('name', ''), 'main': s.get('main', False)} for s in (data.get('items') or [])]
+        if stores:
+            return ok({'items': stores})
+    except Exception:
+        pass
+    # Fallback: уникальные склады из location_stores в БД
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT store_id, store_name FROM location_stores WHERE store_id > 0 ORDER BY store_id")
+    rows = cur.fetchall()
+    conn.close()
+    stores = [{'id': r[0], 'name': r[1] or f'Склад #{r[0]}', 'main': False} for r in rows]
     return ok({'items': stores})
 
 
