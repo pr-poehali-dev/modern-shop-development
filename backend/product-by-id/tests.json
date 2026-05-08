@@ -1,0 +1,20 @@
+{
+  "tests": [
+    {
+      "name": "Get product by id=5",
+      "method": "GET",
+      "path": "/?id=5",
+      "expectedStatus": 200,
+      "expectedBody": {"product": {}},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Missing id returns 400",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 400,
+      "expectedBody": {"error": "id is required"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

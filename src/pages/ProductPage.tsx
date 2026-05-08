@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { useLocationStores } from "@/hooks/useVisibleStores";
 
-const API_URL = "https://functions.poehali.dev/c7265605-961b-48cb-9594-4caad2cb333e";
+const PRODUCT_API_URL = "https://functions.poehali.dev/42cc11fa-0fb5-41fd-a771-fc9811521293";
 
 interface StockEntry {
   store_id: number;
@@ -116,21 +116,11 @@ export default function ProductPage() {
   useEffect(() => {
     setLoading(true);
     setError("");
-    const findProduct = async () => {
-      for (let page = 1; page <= 20; page++) {
-        const res = await fetch(`${API_URL}?action=products&page=${page}&per_page=500`);
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
-        const found = (data.items || []).find((p: Product) => String(p.id) === String(id));
-        if (found) return found;
-        if (page >= (data.pages || 1)) break;
-      }
-      return null;
-    };
-    findProduct()
-      .then((found) => {
-        if (found) setProduct(found);
-        else setError("Товар не найден");
+    fetch(`${PRODUCT_API_URL}?id=${id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.product) setProduct(data.product);
+        else setError(data.error || "Товар не найден");
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
