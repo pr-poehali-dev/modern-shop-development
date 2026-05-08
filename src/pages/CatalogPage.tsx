@@ -341,12 +341,33 @@ export default function CatalogPage() {
 
   const totalPages = Math.ceil(total / PER_PAGE);
 
+  const CATALOG_CACHE_TTL = 3 * 60_000; // 3 минуты
+
+  const getCatalogCache = (key: string) => {
+    try {
+      const raw = sessionStorage.getItem(key);
+      if (!raw) return null;
+      const { data, ts } = JSON.parse(raw);
+      if (Date.now() - ts < CATALOG_CACHE_TTL) return data;
+    } catch (e) { void e; }
+    return null;
+  };
+
+  const setCatalogCache = (key: string, data: unknown) => {
+    try { sessionStorage.setItem(key, JSON.stringify({ data, ts: Date.now() })); } catch (e) { void e; }
+  };
+
   const loadCategories = useCallback(async () => {
+    const cacheKey = "sc_catalog_categories";
+    const cached = getCatalogCache(cacheKey);
+    if (cached) { setCategories(cached); setCatLoading(false); return; }
     setCatLoading(true);
     try {
       const res = await fetch(`${API_URL}?action=categories`);
       const data = await res.json();
-      setCategories(data.items || []);
+      const items = data.items || [];
+      setCategories(items);
+      setCatalogCache(cacheKey, items);
     } catch {
       setCategories([]);
     } finally {
@@ -355,13 +376,26 @@ export default function CatalogPage() {
   }, []);
 
   const loadProducts = useCallback(async () => {
-    setLoading(true);
     setError("");
+    let url = `${API_URL}?action=products&page=${page}&per_page=${PER_PAGE}`;
+    if (categoryId) url += `&category_id=${categoryId}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (storeId) url += `&store_id=${storeId}`;
+
+    const cacheKey = `sc_catalog_${url}`;
+    const cached = getCatalogCache(cacheKey);
+    if (cached) {
+      const items: Product[] = cached.items || [];
+      items.sort((a, b) => (isInStockForLocation(b) ? 1 : 0) - (isInStockForLocation(a) ? 1 : 0));
+      setProducts(items);
+      setTotal(cached.total || 0);
+      if (cached.stores?.length) setStores(cached.stores);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
     try {
-      let url = `${API_URL}?action=products&page=${page}&per_page=${PER_PAGE}`;
-      if (categoryId) url += `&category_id=${categoryId}`;
-      if (search) url += `&search=${encodeURIComponent(search)}`;
-      if (storeId) url += `&store_id=${storeId}`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.error) {
@@ -378,6 +412,7 @@ export default function CatalogPage() {
         setProducts(items);
         setTotal(data.total || 0);
         if (data.stores?.length) setStores(data.stores);
+        setCatalogCache(cacheKey, data);
       }
     } catch (e: unknown) {
       setError(String(e));
