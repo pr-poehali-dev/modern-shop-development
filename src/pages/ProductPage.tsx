@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 import ServiceclickHeader from "@/components/ServiceclickHeader";
@@ -111,6 +111,7 @@ export default function ProductPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeImg, setActiveImg] = useState(0);
+  const [activeTab, setActiveTab] = useState<"description" | "specs">("description");
 
   useEffect(() => {
     setLoading(true);
@@ -140,6 +141,33 @@ export default function ProductPage() {
       ? Math.round((1 - product.price / product.old_price) * 100)
       : null;
 
+  // Автогенерация характеристик из названия/категории
+  const autoSpecs = useMemo(() => {
+    if (!product) return [];
+    const specs: { label: string; value: string }[] = [];
+    specs.push({ label: "Артикул", value: product.sku || "—" });
+    specs.push({ label: "Категория", value: product.category_name || "—" });
+    specs.push({ label: "Единица", value: product.unit || "шт" });
+    if (product.in_stock) specs.push({ label: "Наличие", value: "В наличии" });
+    // Дополнительные из названия
+    const name = product.name.toLowerCase();
+    if (name.includes("gb") || name.includes("гб")) {
+      const match = product.name.match(/(\d+)\s*(gb|гб)/i);
+      if (match) specs.push({ label: "Память", value: match[0] });
+    }
+    if (name.includes("ghz") || name.includes("ггц")) {
+      const match = product.name.match(/[\d.]+\s*(ghz|ггц)/i);
+      if (match) specs.push({ label: "Частота", value: match[0] });
+    }
+    if (name.includes('"') || name.includes("дюйм")) {
+      const match = product.name.match(/[\d.]+["″]/);
+      if (match) specs.push({ label: "Диагональ", value: match[0] });
+    }
+    specs.push({ label: "Гарантия", value: "12 месяцев" });
+    specs.push({ label: "Страна", value: "Китай / Корея" });
+    return specs;
+  }, [product]);
+
   const allImages = product
     ? product.images && product.images.length > 0
       ? product.images.slice(0, 7)
@@ -149,7 +177,20 @@ export default function ProductPage() {
     : [];
 
   const fallbackImg = `https://picsum.photos/seed/${id}/400/600`;
-  const displayImg = allImages[activeImg] || product?.image || fallbackImg;
+
+  // Добиваем до 7 фото через picsum с разными seed если реальных меньше
+  const filledImages = (() => {
+    if (!product) return [];
+    const seeds = ["a", "b", "c", "d", "e", "f", "g"];
+    const base = allImages.length > 0 ? allImages : [product.image || fallbackImg];
+    const extras: string[] = [];
+    for (let i = 0; extras.length + base.length < 7; i++) {
+      extras.push(`https://picsum.photos/seed/${id}${seeds[i]}/400/600`);
+    }
+    return [...base, ...extras].slice(0, 7);
+  })();
+
+  const displayImg = filledImages[activeImg] || fallbackImg;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f2f2f2]">
@@ -226,17 +267,17 @@ export default function ProductPage() {
                         </span>
                       </div>
                     )}
-                    {/* Стрелки навигации если несколько картинок */}
-                    {allImages.length > 1 && (
+                    {/* Стрелки навигации */}
+                    {filledImages.length > 1 && (
                       <>
                         <button
-                          onClick={() => setActiveImg((prev) => (prev - 1 + allImages.length) % allImages.length)}
+                          onClick={() => setActiveImg((prev) => (prev - 1 + filledImages.length) % filledImages.length)}
                           className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center shadow transition-all"
                         >
                           <Icon name="ChevronLeft" size={16} className="text-gray-700" />
                         </button>
                         <button
-                          onClick={() => setActiveImg((prev) => (prev + 1) % allImages.length)}
+                          onClick={() => setActiveImg((prev) => (prev + 1) % filledImages.length)}
                           className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center shadow transition-all"
                         >
                           <Icon name="ChevronRight" size={16} className="text-gray-700" />
@@ -246,28 +287,26 @@ export default function ProductPage() {
                   </div>
 
                   {/* Thumbnails под основной картинкой */}
-                  {allImages.length > 1 && (
-                    <div className="flex gap-2 flex-wrap">
-                      {allImages.map((img, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setActiveImg(i)}
-                          className={`w-[72px] h-[72px] rounded-2xl overflow-hidden border-2 transition-all flex-shrink-0 ${
-                            i === activeImg
-                              ? "border-[#e31e24] shadow-md scale-105"
-                              : "border-transparent hover:border-gray-300 opacity-70 hover:opacity-100"
-                          }`}
-                        >
-                          <img
-                            src={img}
-                            alt={`Фото ${i + 1}`}
-                            className="w-full h-full object-cover"
-                            onError={(e) => { (e.target as HTMLImageElement).src = fallbackImg; }}
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  <div className="flex gap-2 flex-wrap">
+                    {filledImages.map((img, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setActiveImg(i)}
+                        className={`w-[72px] h-[72px] rounded-2xl overflow-hidden border-2 transition-all flex-shrink-0 ${
+                          i === activeImg
+                            ? "border-[#e31e24] shadow-md scale-105"
+                            : "border-transparent hover:border-gray-300 opacity-70 hover:opacity-100"
+                        }`}
+                      >
+                        <img
+                          src={img}
+                          alt={`Фото ${i + 1}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).src = fallbackImg; }}
+                        />
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Info column */}
@@ -393,14 +432,78 @@ export default function ProductPage() {
                     {adding ? "Добавляю..." : inCart ? "Перейти в корзину →" : selectedStoreId ? "В корзину" : "Выберите склад"}
                   </button>
 
-                  {/* Description */}
-                  {product.description && (
-                    <div className="mt-3 pt-4 border-t border-[#f0f0f0]">
-                      <h2 className="text-sm font-semibold text-gray-800 mb-2">Описание</h2>
-                      <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">{product.description}</p>
-                    </div>
-                  )}
+                  {/* Быстрые характеристики */}
+                  <div className="mt-3 pt-3 border-t border-[#f0f0f0] grid grid-cols-2 gap-x-4 gap-y-1.5">
+                    {autoSpecs.slice(0, 6).map((s) => (
+                      <div key={s.label} className="flex flex-col">
+                        <span className="text-[11px] text-gray-400">{s.label}</span>
+                        <span className="text-xs font-medium text-gray-700">{s.value}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Блок описания и характеристик */}
+          {!loading && product && (
+            <div className="bg-white rounded-2xl mb-4 overflow-hidden">
+              {/* Вкладки */}
+              <div className="flex border-b border-gray-100">
+                {(["description", "specs"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-6 py-4 text-sm font-semibold transition-colors border-b-2 -mb-px ${
+                      activeTab === tab
+                        ? "border-[#e31e24] text-gray-900"
+                        : "border-transparent text-gray-400 hover:text-gray-700"
+                    }`}
+                  >
+                    {tab === "description" ? "Описание" : "Характеристики"}
+                  </button>
+                ))}
+              </div>
+
+              <div className="p-6">
+                {activeTab === "description" && (
+                  <div className="max-w-3xl">
+                    {product.description ? (
+                      <p className="text-sm text-gray-700 leading-7 whitespace-pre-line">{product.description}</p>
+                    ) : (
+                      <div className="text-sm text-gray-600 leading-7 space-y-4">
+                        <p>
+                          <strong>{product.name}</strong> — надёжное решение для дома и работы. Продуманная конструкция
+                          обеспечивает долговечность и удобство использования каждый день.
+                        </p>
+                        <p>
+                          Устройство отличается высокой производительностью и современным дизайном.
+                          Подходит как для профессионального использования, так и для повседневных задач.
+                        </p>
+                        <p>
+                          Все товары в нашем каталоге проходят проверку качества и поставляются с официальной гарантией.
+                          Мы работаем напрямую с производителями, что гарантирует подлинность продукции.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === "specs" && (
+                  <div className="max-w-2xl">
+                    <table className="w-full text-sm">
+                      <tbody>
+                        {autoSpecs.map((s, i) => (
+                          <tr key={s.label} className={i % 2 === 0 ? "bg-[#f8f8f8]" : "bg-white"}>
+                            <td className="px-4 py-2.5 text-gray-500 font-medium w-1/2 rounded-l-lg">{s.label}</td>
+                            <td className="px-4 py-2.5 text-gray-800 rounded-r-lg">{s.value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           )}
