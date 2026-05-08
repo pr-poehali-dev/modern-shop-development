@@ -120,12 +120,25 @@ export default function ServiceclickHero() {
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    const CACHE_KEY = "sc_banners";
+    const CACHE_TTL = 5 * 60_000;
+    try {
+      const cached = sessionStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { data, ts } = JSON.parse(cached);
+        if (Date.now() - ts < CACHE_TTL && data.length > 0) {
+          setSlides(data);
+          return;
+        }
+      }
+    } catch (e) { void e; }
+
     fetch(`${ADMIN_API}?action=banners`)
       .then(r => r.json())
       .then(d => {
         const active = (d.items || []).filter((b: { is_active: boolean }) => b.is_active);
         if (active.length > 0) {
-          setSlides(active.map((b: {
+          const mapped = active.map((b: {
             id: number; image_url: string; title: string; subtitle: string;
             button_text: string; bg_color: string; link: string; timer: number; effect: string;
           }) => ({
@@ -138,7 +151,9 @@ export default function ServiceclickHero() {
             link: b.link || "",
             timer: b.timer || 5000,
             effect: b.effect || "slide",
-          })));
+          }));
+          setSlides(mapped);
+          try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: mapped, ts: Date.now() })); } catch (e) { void e; }
         }
       })
       .catch(() => {});

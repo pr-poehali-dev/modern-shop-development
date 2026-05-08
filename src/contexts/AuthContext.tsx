@@ -2,6 +2,24 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 
 const AUTH_URL = "https://functions.poehali.dev/382b85d9-e653-4b8a-8ba9-eb8f96548e2a";
 const TOKEN_KEY = "sc_user_token";
+const USER_CACHE_KEY = "sc_user_cache";
+const USER_CACHE_TTL = 30 * 60_000; // 30 минут
+
+function getCachedUser(): User | null {
+  try {
+    const raw = localStorage.getItem(USER_CACHE_KEY);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    if (Date.now() - ts < USER_CACHE_TTL) return data as User;
+  } catch (e) { void e; }
+  return null;
+}
+function setCachedUser(user: User) {
+  try { localStorage.setItem(USER_CACHE_KEY, JSON.stringify({ data: user, ts: Date.now() })); } catch (e) { void e; }
+}
+function clearCachedUser() {
+  try { localStorage.removeItem(USER_CACHE_KEY); } catch (e) { void e; }
+}
 
 interface User {
   id: number;
@@ -21,13 +39,15 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => getCachedUser());
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !getCachedUser() && !!localStorage.getItem(TOKEN_KEY));
 
   useEffect(() => {
     const savedToken = localStorage.getItem(TOKEN_KEY);
     if (!savedToken) { setLoading(false); return; }
+    // Если есть свежий кеш — не идём на сервер
+    if (getCachedUser()) { setLoading(false); return; }
     fetch(AUTH_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Auth-Token": savedToken },
@@ -35,10 +55,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
       .then((r) => r.json())
       .then((data) => {
-        if (data.user) { setUser(data.user); setToken(savedToken); }
-        else { localStorage.removeItem(TOKEN_KEY); setToken(null); }
+        if (data.user) { setUser(data.user); setToken(savedToken); setCachedUser(data.user); }
+        else { localStorage.removeItem(TOKEN_KEY); clearCachedUser(); setToken(null); }
       })
-      .catch(() => { localStorage.removeItem(TOKEN_KEY); setToken(null); })
+      .catch(() => { localStorage.removeItem(TOKEN_KEY); clearCachedUser(); setToken(null); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -53,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(TOKEN_KEY, data.token);
     setToken(data.token);
     setUser(data.user);
+    setCachedUser(data.user);
     return {};
   };
 
@@ -67,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(TOKEN_KEY, data.token);
     setToken(data.token);
     setUser(data.user);
+    setCachedUser(data.user);
     return {};
   };
 
@@ -80,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }).catch(() => {});
     }
     localStorage.removeItem(TOKEN_KEY);
+    clearCachedUser();
     setToken(null);
     setUser(null);
   };
