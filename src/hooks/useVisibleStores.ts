@@ -9,12 +9,32 @@ export interface ShopLocation {
   store_ids: number[];
 }
 
+const CACHE_TTL = 5 * 60_000; // 5 минут
+const SS_STORES_KEY = "sc_visible_stores";
+const SS_LOCATIONS_KEY = "sc_locations";
+
+function ssGet<T>(key: string): { data: T; ts: number } | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+function ssSet(key: string, data: unknown) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify({ data, ts: Date.now() }));
+  } catch (_) {
+    // sessionStorage недоступен
+  }
+}
+
 // Кэш для глобальных настроек складов
-let globalCache: number[] | null = null;
-let globalCacheTime = 0;
-let locationsCache: ShopLocation[] | null = null;
-let locationsCacheTime = 0;
-const CACHE_TTL = 60_000;
+const _ssStores = ssGet<number[]>(SS_STORES_KEY);
+const _ssLoc = ssGet<ShopLocation[]>(SS_LOCATIONS_KEY);
+let globalCache: number[] | null = _ssStores && Date.now() - _ssStores.ts < CACHE_TTL ? _ssStores.data : null;
+let globalCacheTime = globalCache ? Date.now() : 0;
+let locationsCache: ShopLocation[] | null = _ssLoc && Date.now() - _ssLoc.ts < CACHE_TTL ? _ssLoc.data : null;
+let locationsCacheTime = locationsCache ? Date.now() : 0;
 
 export function useVisibleStores() {
   const [storeIds, setStoreIds] = useState<number[] | null>(globalCache);
@@ -31,6 +51,7 @@ export function useVisibleStores() {
         const ids = data.store_ids || [];
         globalCache = ids;
         globalCacheTime = Date.now();
+        ssSet(SS_STORES_KEY, ids);
         setStoreIds(ids);
       })
       .catch(() => {
@@ -57,6 +78,7 @@ export function useShopLocations() {
         const items: ShopLocation[] = data.items || [];
         locationsCache = items;
         locationsCacheTime = Date.now();
+        ssSet(SS_LOCATIONS_KEY, items);
         setLocations(items);
       })
       .catch(() => {
