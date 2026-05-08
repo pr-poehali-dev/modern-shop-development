@@ -107,20 +107,38 @@ export default function ProductPage() {
   const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
   const [conflictMsg, setConflictMsg] = useState<string | null>(null);
   const inCart = items.some((i) => i.product_id === String(id));
-  const [product, setProduct] = useState<Product | null>(null);
-  const [loading, setLoading] = useState(true);
+  const CACHE_KEY = `sc_product_${id}`;
+  const CACHE_TTL = 10 * 60_000; // 10 минут
+
+  const getCached = (): Product | null => {
+    try {
+      const raw = sessionStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      const { data, ts } = JSON.parse(raw);
+      if (Date.now() - ts < CACHE_TTL) return data as Product;
+    } catch (e) { void e; }
+    return null;
+  };
+
+  const [product, setProduct] = useState<Product | null>(() => getCached());
+  const [loading, setLoading] = useState(() => !getCached());
   const [error, setError] = useState("");
   const [activeImg, setActiveImg] = useState(0);
   const [activeTab, setActiveTab] = useState<"description" | "specs">("description");
 
   useEffect(() => {
+    if (getCached()) return;
     setLoading(true);
     setError("");
     fetch(`${PRODUCT_API_URL}?id=${id}`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.product) setProduct(data.product);
-        else setError(data.error || "Товар не найден");
+        if (data.product) {
+          setProduct(data.product);
+          try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: data.product, ts: Date.now() })); } catch (e) { void e; }
+        } else {
+          setError(data.error || "Товар не найден");
+        }
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
