@@ -203,53 +203,32 @@ def handle_cart_clear(conn, user_id: int) -> dict:
     return ok({'ok': True})
 
 
-def fetch_product_data(search_term: str) -> dict | None:
-    """Загружает данные товара из каталога ProMaster по SKU или ID."""
-    try:
-        url = f"{CATALOG_API_URL}?action=products&search={urllib.request.quote(str(search_term))}&per_page=50"
-        req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            raw = resp.read().decode('utf-8')
-        envelope = json.loads(raw)
-        # Каталог оборачивает ответ в {statusCode, body: "...json..."}
-        if isinstance(envelope.get('body'), str):
-            data = json.loads(envelope['body'])
-        else:
-            data = envelope
-        return data
-    except Exception as e:
-        print(f"[stock_check] fetch ERROR: {e}")
-    return None
-
-
 def fetch_live_stock(product_id: str, product_sku: str, store_id: int | None) -> int | None:
-    """Возвращает актуальный остаток товара. Если store_id=None — суммарный по всем складам."""
-    # Ищем сначала по SKU (точнее), потом по product_id
-    for search_term in list(dict.fromkeys([product_sku, product_id])):
-        if not search_term:
-            continue
-        data = fetch_product_data(search_term)
-        if not data:
-            continue
+    """Возвращает актуальный остаток товара по первому совпадению (SKU или ID)."""
+    search_terms = list(dict.fromkeys(t for t in [product_sku, product_id] if t))
+    if not search_terms:
+        return None
+    # Один запрос — по SKU (точнее всего)
+    search_term = search_terms[0]
+    try:
+        url = f"{CATALOG_API_URL}?action=products&search={urllib.request.quote(str(search_term))}&per_page=20"
+        with urllib.request.urlopen(url, timeout=8) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+        if isinstance(data.get('body'), str):
+            data = json.loads(data['body'])
         for product in (data.get('items') or []):
             pid = str(product.get('id', ''))
             psku = str(product.get('sku', ''))
-            if pid == str(product_id) or psku == str(product_sku) or pid == str(product_sku) or psku == str(product_id):
+            if pid == str(product_id) or psku == str(product_sku):
                 stock_list = product.get('stock_by_store') or []
                 if store_id is not None:
                     for s in stock_list:
                         if int(s.get('store_id', -1)) == int(store_id):
-                            qty = int(s.get('quantity', 0))
-                            print(f"[stock_check] id={product_id} sku={product_sku} store={store_id} qty={qty}")
-                            return qty
-                    print(f"[stock_check] store_id={store_id} not found, returning 0")
+                            return int(s.get('quantity', 0))
                     return 0
-                else:
-                    # Нет склада — суммируем по всем
-                    total = sum(int(s.get('quantity', 0)) for s in stock_list)
-                    print(f"[stock_check] id={product_id} no store, total_qty={total}")
-                    return total
-        print(f"[stock_check] product not found for search={search_term}")
+                return sum(int(s.get('quantity', 0)) for s in stock_list)
+    except Exception as e:
+        print(f"[stock_check] ERROR: {e}")
     return None
 
 
