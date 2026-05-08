@@ -44,9 +44,26 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | null>(null);
 
+const CART_CACHE_KEY = "sc_cart_items";
+
+function loadCartCache(): CartItem[] {
+  try {
+    const raw = localStorage.getItem(CART_CACHE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { void e; return []; }
+}
+
+function saveCartCache(items: CartItem[]) {
+  try { localStorage.setItem(CART_CACHE_KEY, JSON.stringify(items)); } catch (e) { void e; }
+}
+
+function clearCartCache() {
+  try { localStorage.removeItem(CART_CACHE_KEY); } catch (e) { void e; }
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const { token, user } = useAuth();
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items, setItems] = useState<CartItem[]>(() => loadCartCache());
   const [loading, setLoading] = useState(false);
 
   const call = useCallback(
@@ -63,11 +80,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
   );
 
   const reload = useCallback(async () => {
-    if (!token) { setItems([]); return; }
+    if (!token) { setItems([]); clearCartCache(); return; }
     setLoading(true);
     try {
       const data = await call({ action: "cart.get" });
-      setItems(data?.items || []);
+      const fresh = data?.items || [];
+      setItems(fresh);
+      saveCartCache(fresh);
     } finally {
       setLoading(false);
     }
@@ -109,12 +128,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (data?.item) {
       setItems((prev) => {
         const idx = prev.findIndex((i) => i.product_id === data.item.product_id);
-        if (idx >= 0) {
-          const next = [...prev];
-          next[idx] = data.item;
-          return next;
-        }
-        return [...prev, data.item];
+        const next = idx >= 0
+          ? prev.map((it, i) => i === idx ? data.item : it)
+          : [...prev, data.item];
+        saveCartCache(next);
+        return next;
       });
     }
     return { ok: true };
@@ -136,23 +154,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
 
     if (quantity <= 0) {
-      setItems((prev) => prev.filter((i) => i.product_id !== product_id));
+      setItems((prev) => { const next = prev.filter((i) => i.product_id !== product_id); saveCartCache(next); return next; });
     } else {
-      setItems((prev) =>
-        prev.map((i) => (i.product_id === product_id ? { ...i, quantity } : i))
-      );
+      setItems((prev) => { const next = prev.map((i) => (i.product_id === product_id ? { ...i, quantity } : i)); saveCartCache(next); return next; });
     }
     return { ok: true };
   };
 
   const removeItem = async (product_id: string) => {
     await call({ action: "cart.remove", product_id });
-    setItems((prev) => prev.filter((i) => i.product_id !== product_id));
+    setItems((prev) => { const next = prev.filter((i) => i.product_id !== product_id); saveCartCache(next); return next; });
   };
 
   const clearCart = async () => {
     await call({ action: "cart.clear" });
     setItems([]);
+    clearCartCache();
   };
 
   const count = items.reduce((s, i) => s + i.quantity, 0);
