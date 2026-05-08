@@ -5,6 +5,7 @@ import ServiceclickDailyDeals from "@/components/ServiceclickDailyDeals";
 import ServiceclickPromo from "@/components/ServiceclickPromo";
 import ServiceclickCategories from "@/components/ServiceclickCategories";
 import ServiceclickBrands from "@/components/ServiceclickBrands";
+import ServiceclickBottomBanners from "@/components/ServiceclickBottomBanners";
 import ServiceclickFooter from "@/components/ServiceclickFooter";
 
 export default function Index() {
@@ -18,6 +19,7 @@ export default function Index() {
         <ServiceclickPromo />
         <ServiceclickCategories />
         <ServiceclickBrands />
+        <ServiceclickBottomBanners />
       </main>
       <ServiceclickFooter />
     </div>
