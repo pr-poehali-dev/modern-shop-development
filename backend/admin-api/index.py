@@ -408,30 +408,61 @@ def handle_settings(method, body):
 
 
 # --- PROMASTER STORES ---
+STORES_CACHE_KEY = 'cache_promaster_stores'
+STORES_CACHE_TTL = 600  # 10 минут
+
 def handle_promaster_stores():
-    """Возвращает список складов из ProMaster API; fallback — из location_stores в БД"""
+    """Возвращает список складов из ProMaster API с кешем 10 мин в БД."""
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Читаем кеш
+    cur.execute(
+        "SELECT value, updated_at FROM shop_settings WHERE key = %s",
+        (STORES_CACHE_KEY,)
+    )
+    row = cur.fetchone()
+    if row and row[0] and row[1]:
+        age = (datetime.now() - row[1].replace(tzinfo=None)).total_seconds()
+        if age < STORES_CACHE_TTL:
+            conn.close()
+            return ok({'items': json.loads(row[0]), 'cached': True})
+
+    # Запрашиваем у ProMaster
+    stores = None
     try:
         token = os.environ.get('PROMASTER_API_TOKEN', '')
-        base_url = "https://pm-71723.promaster.app"
         req = urllib.request.Request(
-            f"{base_url}/api/v1/store/getStores?limit=100",
+            "https://pm-71723.promaster.app/api/v1/store/getStores?limit=100",
             headers={'Authorization': token}
         )
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read().decode('utf-8'))
-        stores = [{'id': s.get('id'), 'name': s.get('name', ''), 'main': s.get('main', False)} for s in (data.get('items') or [])]
-        if stores:
-            return ok({'items': stores})
+        fetched = [{'id': s.get('id'), 'name': s.get('name', ''), 'main': s.get('main', False)} for s in (data.get('items') or [])]
+        if fetched:
+            stores = fetched
     except Exception:
         pass
-    # Fallback: уникальные склады из location_stores в БД
-    conn = get_db()
-    cur = conn.cursor()
+
+    # Сохраняем в кеш если получили данные
+    if stores:
+        cur.execute(
+            "INSERT INTO shop_settings (key, value, label, group_name, updated_at) VALUES (%s, %s, 'Кеш складов ProMaster', 'cache', NOW()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()",
+            (STORES_CACHE_KEY, json.dumps(stores))
+        )
+        conn.commit()
+        conn.close()
+        return ok({'items': stores})
+
+    # Fallback: устаревший кеш или location_stores
+    if row and row[0]:
+        conn.close()
+        return ok({'items': json.loads(row[0]), 'cached': True})
+
     cur.execute("SELECT DISTINCT store_id, store_name FROM location_stores WHERE store_id > 0 ORDER BY store_id")
     rows = cur.fetchall()
     conn.close()
-    stores = [{'id': r[0], 'name': r[1] or f'Склад #{r[0]}', 'main': False} for r in rows]
-    return ok({'items': stores})
+    return ok({'items': [{'id': r[0], 'name': r[1] or f'Склад #{r[0]}', 'main': False} for r in rows]})
 
 
 # --- SHOP WAREHOUSES (выбранные склады для магазина) ---
