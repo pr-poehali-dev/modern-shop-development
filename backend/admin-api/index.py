@@ -417,7 +417,7 @@ def handle_promaster_stores():
             f"{base_url}/api/v1/store/getStores?limit=100",
             headers={'Authorization': token}
         )
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read().decode('utf-8'))
         stores = [{'id': s.get('id'), 'name': s.get('name', ''), 'main': s.get('main', False)} for s in (data.get('items') or [])]
         if stores:
