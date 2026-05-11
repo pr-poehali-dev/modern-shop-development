@@ -407,6 +407,27 @@ def handle_settings(method, body):
     return err('Метод не поддерживается', 405)
 
 
+# --- PROMASTER GROUPS ---
+def handle_promaster_groups():
+    """Возвращает список групп номенклатуры из ProMaster (иерархия категорий)."""
+    token = os.environ.get('PROMASTER_API_TOKEN', '')
+    all_items = []
+    page = 1
+    while True:
+        req = urllib.request.Request(
+            f"https://pm-71723.promaster.app/api/v1/store/getGroups?limit=100&page={page}",
+            headers={'Authorization': token, 'Content-type': 'application/json'}
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+        items = data.get('items') or []
+        all_items.extend(items)
+        if page >= (data.get('pages') or 1):
+            break
+        page += 1
+    return ok({'items': all_items, 'count': len(all_items)})
+
+
 # --- PROMASTER STORES ---
 STORES_CACHE_KEY = 'cache_promaster_stores'
 STORES_CACHE_TTL = 600  # 10 минут
@@ -591,6 +612,8 @@ def handler(event: dict, context) -> dict:
         return handle_shop_warehouses('GET', {})
     if action == 'locations_public' and method == 'GET':
         return handle_locations_public()
+    if action == 'promaster_groups' and method == 'GET':
+        return handle_promaster_groups()
 
     # Защищённые маршруты
     user = verify_token(headers)
@@ -617,6 +640,8 @@ def handler(event: dict, context) -> dict:
         return handle_requests(method, body, params)
     if action == 'promaster_stores':
         return handle_promaster_stores()
+    if action == 'promaster_groups':
+        return handle_promaster_groups()
     if action == 'shop_warehouses':
         return handle_shop_warehouses(method, body)
     if action == 'location_stores':
