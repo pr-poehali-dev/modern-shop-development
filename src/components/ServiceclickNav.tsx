@@ -25,6 +25,7 @@ export default function ServiceclickNav() {
   const [open, setOpen] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string | number>>(new Set());
   const panelRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -51,6 +52,19 @@ export default function ServiceclickNav() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
+
+  const rootCats = categories.filter((c) => !c.parent_id);
+  const childrenOf = (parentId: string | number) =>
+    categories.filter((c) => String(c.parent_id) === String(parentId));
+
+  const toggleExpand = (id: string | number) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const handleCategoryClick = (cat: Category) => {
     setOpen(false);
@@ -143,18 +157,52 @@ export default function ServiceclickNav() {
             <p className="text-xs text-gray-400 px-4 py-4">Категории не найдены</p>
           )}
 
-          {!loading && categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => handleCategoryClick(cat)}
-              className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-[#3a3a3a] hover:text-[#e31e24] transition-colors border-b border-[#444] text-left"
-            >
-              <span className="truncate">{cat.name}</span>
-              {cat.count > 0 && (
-                <span className="text-[10px] text-gray-500 ml-2 flex-shrink-0">{cat.count}</span>
-              )}
-            </button>
-          ))}
+          {!loading && rootCats.map((cat) => {
+            const children = childrenOf(cat.id);
+            const hasChildren = children.length > 0;
+            const isExpanded = expandedIds.has(cat.id);
+
+            return (
+              <div key={cat.id}>
+                <div className="flex items-stretch border-b border-[#444]">
+                  <button
+                    onClick={() => handleCategoryClick(cat)}
+                    className="flex-1 flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-[#3a3a3a] hover:text-[#e31e24] transition-colors text-left"
+                  >
+                    <span className="truncate">{cat.name}</span>
+                    {!hasChildren && cat.count > 0 && (
+                      <span className="text-[10px] text-gray-500 ml-2 flex-shrink-0">{cat.count}</span>
+                    )}
+                  </button>
+                  {hasChildren && (
+                    <button
+                      onClick={() => toggleExpand(cat.id)}
+                      className="px-3 text-gray-400 hover:text-[#e31e24] hover:bg-[#3a3a3a] transition-colors flex-shrink-0 flex items-center"
+                    >
+                      <Icon name={isExpanded ? "ChevronUp" : "ChevronDown"} size={13} />
+                    </button>
+                  )}
+                </div>
+
+                {hasChildren && isExpanded && (
+                  <div className="bg-[#252525]">
+                    {children.map((child) => (
+                      <button
+                        key={child.id}
+                        onClick={() => handleCategoryClick(child)}
+                        className="w-full flex items-center justify-between pl-8 pr-4 py-2 text-[13px] text-gray-300 hover:bg-[#3a3a3a] hover:text-[#e31e24] transition-colors border-b border-[#383838] text-left"
+                      >
+                        <span className="truncate">{child.name}</span>
+                        {child.count > 0 && (
+                          <span className="text-[10px] text-gray-500 ml-2 flex-shrink-0">{child.count}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </>
