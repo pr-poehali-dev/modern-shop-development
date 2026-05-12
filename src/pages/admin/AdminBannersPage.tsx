@@ -186,8 +186,8 @@ export default function AdminBannersPage() {
     if (imageBase64) {
       payload.image_base64 = imageBase64;
       payload.image_filename = imageFilename;
-    } else if (imagePreview && !imageBase64) {
-      payload.image_url = imagePreview;
+    } else {
+      payload.image_url = imagePreview || "";
     }
     const res = await fetch(`${ADMIN_API_URL}?action=banners`, {
       method,
