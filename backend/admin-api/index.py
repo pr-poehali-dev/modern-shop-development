@@ -204,9 +204,14 @@ def handle_banners(method, body, params):
         if not bid:
             conn.close()
             return err('ID обязателен')
-        image_url = body.get('image_url', '')
         if body.get('image_base64') and body.get('image_filename'):
             image_url = upload_image_to_s3(body['image_base64'], body['image_filename'])
+        elif 'image_url' in body:
+            image_url = body['image_url']
+        else:
+            cur.execute("SELECT image_url FROM banners WHERE id = %s", (bid,))
+            row = cur.fetchone()
+            image_url = row[0] if row else ''
         cur.execute(
             "UPDATE banners SET title=%s, subtitle=%s, image_url=%s, link=%s, button_text=%s, is_active=%s, sort_order=%s, timer=%s, effect=%s, bg_color=%s, updated_at=NOW() WHERE id=%s",
             (body.get('title'), body.get('subtitle'), image_url, body.get('link'), body.get('button_text'), body.get('is_active', True), body.get('sort_order', 0), body.get('timer', 5000), body.get('effect', 'slide'), body.get('bg_color', ''), bid)
@@ -219,7 +224,7 @@ def handle_banners(method, body, params):
         if not bid:
             conn.close()
             return err('ID обязателен')
-        cur.execute("UPDATE banners SET is_active = FALSE WHERE id = %s", (bid,))
+        cur.execute("DELETE FROM banners WHERE id = %s", (bid,))
         conn.commit()
         conn.close()
         return ok({'ok': True})
