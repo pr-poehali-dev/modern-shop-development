@@ -407,9 +407,12 @@ def handle_settings(method, body):
     return err('Метод не поддерживается', 405)
 
 
-# --- PROMASTER GROUPS ---
-def handle_promaster_groups():
-    """Возвращает список групп номенклатуры из ProMaster (иерархия категорий)."""
+# --- PROMASTER GROUPS / CATEGORIES ---
+GROUPS_CACHE_KEY = 'cache_promaster_groups'
+GROUPS_CACHE_TTL = 600  # 10 минут
+
+def fetch_promaster_groups():
+    """Загружает все группы номенклатуры из ProMaster со всех страниц."""
     token = os.environ.get('PROMASTER_API_TOKEN', '')
     all_items = []
     page = 1
@@ -425,7 +428,42 @@ def handle_promaster_groups():
         if page >= (data.get('pages') or 1):
             break
         page += 1
-    return ok({'items': all_items, 'count': len(all_items)})
+    return all_items
+
+def handle_categories():
+    """Возвращает категории (группы) с иерархией parent_id для бокового меню каталога."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT value, updated_at FROM shop_settings WHERE key = %s", (GROUPS_CACHE_KEY,))
+    row = cur.fetchone()
+    if row and row[0] and row[1]:
+        age = (datetime.now() - row[1].replace(tzinfo=None)).total_seconds()
+        if age < GROUPS_CACHE_TTL:
+            conn.close()
+            return ok({'items': json.loads(row[0]), 'cached': True})
+    groups = fetch_promaster_groups()
+    result = [
+        {
+            'id': g.get('id'),
+            'name': g.get('name', ''),
+            'parent_id': g.get('parentId') if g.get('parentId') else None,
+            'count': 0,
+        }
+        for g in groups
+    ]
+    if result:
+        cur.execute(
+            "INSERT INTO shop_settings (key, value, label, group_name, updated_at) VALUES (%s, %s, 'Кеш групп ProMaster', 'cache', NOW()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()",
+            (GROUPS_CACHE_KEY, json.dumps(result))
+        )
+        conn.commit()
+    conn.close()
+    return ok({'items': result})
+
+def handle_promaster_groups():
+    """Возвращает сырые группы номенклатуры из ProMaster."""
+    groups = fetch_promaster_groups()
+    return ok({'items': groups, 'count': len(groups)})
 
 
 # --- PROMASTER STORES ---
@@ -614,6 +652,8 @@ def handler(event: dict, context) -> dict:
         return handle_locations_public()
     if action == 'promaster_groups' and method == 'GET':
         return handle_promaster_groups()
+    if action == 'categories' and method == 'GET':
+        return handle_categories()
 
     # Защищённые маршруты
     user = verify_token(headers)

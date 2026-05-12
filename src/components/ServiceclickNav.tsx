@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 
-const API_URL = "https://functions.poehali.dev/c7265605-961b-48cb-9594-4caad2cb333e";
+const API_URL = "https://functions.poehali.dev/58efb070-a53e-4380-88c5-6f0f16480430";
 
 interface Category {
   id: string | number;

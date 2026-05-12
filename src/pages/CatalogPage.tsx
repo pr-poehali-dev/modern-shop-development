@@ -9,6 +9,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useLocationStores } from "@/hooks/useVisibleStores";
 
 const API_URL = "https://functions.poehali.dev/c7265605-961b-48cb-9594-4caad2cb333e";
+const ADMIN_API_URL = "https://functions.poehali.dev/58efb070-a53e-4380-88c5-6f0f16480430";
 const USER_API_URL = "https://functions.poehali.dev/ef02c3ce-d482-422a-9426-60d8f91b4b86";
 const PER_PAGE = 24;
 
@@ -358,12 +359,12 @@ export default function CatalogPage() {
   };
 
   const loadCategories = useCallback(async () => {
-    const cacheKey = "sc_catalog_categories";
+    const cacheKey = "sc_catalog_categories_v2";
     const cached = getCatalogCache(cacheKey);
     if (cached) { setCategories(cached); setCatLoading(false); return; }
     setCatLoading(true);
     try {
-      const res = await fetch(`${API_URL}?action=categories`);
+      const res = await fetch(`${ADMIN_API_URL}?action=categories`);
       const data = await res.json();
       const items = data.items || [];
       setCategories(items);
