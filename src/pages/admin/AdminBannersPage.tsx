@@ -144,10 +144,17 @@ export default function AdminBannersPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`${ADMIN_API_URL}?action=banners`, { headers: { "X-Admin-Token": token! } });
-    const data = await res.json();
-    setBanners(data.items || []);
-    setLoading(false);
+    try {
+      const res = await fetch(`${ADMIN_API_URL}?action=banners`, { headers: { "X-Admin-Token": token! } });
+      const data = await res.json();
+      console.log("[load] status=", res.status, "items=", data.items?.length, "error=", data.error);
+      setBanners(data.items || []);
+    } catch (e) {
+      console.error("[load] fetch error:", e);
+      toast.error("Не удалось загрузить баннеры");
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
 
   useEffect(() => { load(); }, [load]);
@@ -165,8 +172,19 @@ export default function AdminBannersPage() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const result = e.target?.result as string;
-      setImagePreview(result);
-      setImageBase64(result);
+      const img = new Image();
+      img.onload = () => {
+        const maxW = 1200;
+        const scale = img.width > maxW ? maxW / img.width : 1;
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const compressed = canvas.toDataURL("image/jpeg", 0.82);
+        setImagePreview(compressed);
+        setImageBase64(compressed);
+      };
+      img.src = result;
     };
     reader.readAsDataURL(file);
   };
