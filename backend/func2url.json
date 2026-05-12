@@ -1,4 +1,5 @@
 {
+  "catalog-api": "https://functions.poehali.dev/15c8aecd-d37b-4aed-abce-dc0748135610",
   "product-by-id": "https://functions.poehali.dev/42cc11fa-0fb5-41fd-a771-fc9811521293",
   "user-api": "https://functions.poehali.dev/ef02c3ce-d482-422a-9426-60d8f91b4b86",
   "user-auth": "https://functions.poehali.dev/382b85d9-e653-4b8a-8ba9-eb8f96548e2a",

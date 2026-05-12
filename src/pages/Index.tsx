@@ -2,6 +2,7 @@ import ServiceclickHeader from "@/components/ServiceclickHeader";
 import ServiceclickNav from "@/components/ServiceclickNav";
 import ServiceclickHero from "@/components/ServiceclickHero";
 import ServiceclickDailyDeals from "@/components/ServiceclickDailyDeals";
+import ServiceclickNewArrivals from "@/components/ServiceclickNewArrivals";
 import ServiceclickPromo from "@/components/ServiceclickPromo";
 import ServiceclickCategories from "@/components/ServiceclickCategories";
 import ServiceclickBrands from "@/components/ServiceclickBrands";
@@ -16,6 +17,7 @@ export default function Index() {
       <main className="flex-1">
         <ServiceclickHero />
         <ServiceclickDailyDeals />
+        <ServiceclickNewArrivals />
         <ServiceclickPromo />
         <ServiceclickCategories />
         <ServiceclickBrands />

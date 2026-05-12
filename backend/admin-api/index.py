@@ -632,6 +632,81 @@ def handle_orders(method, body, params):
     return err('Метод не поддерживается', 405)
 
 
+def handle_catalog_featured(method, body, params):
+    conn = get_db()
+    cur = conn.cursor()
+    section = params.get('section') or body.get('section') or 'daily'
+
+    if method == 'GET':
+        cur.execute(
+            "SELECT id, section, product_id, product_name, product_price, product_image, sort_order FROM catalog_featured WHERE section=%s AND sort_order >= 0 ORDER BY sort_order, id",
+            (section,)
+        )
+        rows = cur.fetchall()
+        conn.close()
+        return ok({'items': [{'id': r[0], 'section': r[1], 'product_id': r[2], 'product_name': r[3], 'product_price': float(r[4]) if r[4] else 0, 'product_image': r[5] or '', 'sort_order': r[6]} for r in rows]})
+
+    if method == 'POST':
+        pid = body.get('product_id')
+        if not pid:
+            conn.close()
+            return err('product_id обязателен')
+        cur.execute("SELECT name, price, image_url FROM catalog_products WHERE id=%s", (int(pid),))
+        p = cur.fetchone()
+        pname = p[0] if p else body.get('product_name', '')
+        pprice = float(p[1]) if p else float(body.get('product_price', 0))
+        pimage = p[2] if p else body.get('product_image', '')
+        cur.execute("SELECT COUNT(*) FROM catalog_featured WHERE section=%s AND sort_order >= 0", (section,))
+        sort_order = cur.fetchone()[0]
+        cur.execute(
+            "INSERT INTO catalog_featured (section, product_id, product_name, product_price, product_image, sort_order) VALUES (%s,%s,%s,%s,%s,%s) RETURNING id",
+            (section, int(pid), pname, pprice, pimage, sort_order)
+        )
+        new_id = cur.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return ok({'id': new_id}, 201)
+
+    if method == 'DELETE':
+        fid = params.get('id') or body.get('id')
+        if not fid:
+            conn.close()
+            return err('id обязателен')
+        cur.execute("UPDATE catalog_featured SET sort_order=-999 WHERE id=%s", (int(fid),))
+        conn.commit()
+        conn.close()
+        return ok({'ok': True})
+
+    if method == 'PUT':
+        # Обновление порядка: [{id, sort_order}, ...]
+        items = body.get('items', [])
+        for item in items:
+            cur.execute("UPDATE catalog_featured SET sort_order=%s WHERE id=%s", (item['sort_order'], item['id']))
+        conn.commit()
+        conn.close()
+        return ok({'ok': True})
+
+    conn.close()
+    return err('Метод не поддерживается', 405)
+
+
+def handle_catalog_search(params):
+    """Поиск товаров в БД для добавления в подборки"""
+    conn = get_db()
+    cur = conn.cursor()
+    q = params.get('q', '').strip()
+    if not q or len(q) < 2:
+        conn.close()
+        return ok({'items': []})
+    cur.execute(
+        "SELECT id, name, price, image_url, sku FROM catalog_products WHERE is_active=TRUE AND (name ILIKE %s OR sku ILIKE %s) ORDER BY name LIMIT 20",
+        (f'%{q}%', f'%{q}%')
+    )
+    rows = cur.fetchall()
+    conn.close()
+    return ok({'items': [{'id': r[0], 'name': r[1], 'price': float(r[2]), 'image': r[3] or '', 'sku': r[4] or ''} for r in rows]})
+
+
 def handler(event: dict, context) -> dict:
     """Главный обработчик admin API"""
     if event.get('httpMethod') == 'OPTIONS':
@@ -696,5 +771,9 @@ def handler(event: dict, context) -> dict:
         return handle_shop_warehouses(method, body)
     if action == 'location_stores':
         return handle_location_stores(method, body, params)
+    if action == 'catalog_featured':
+        return handle_catalog_featured(method, body, params)
+    if action == 'catalog_search':
+        return handle_catalog_search(params)
 
     return err('Неизвестный action', 404)

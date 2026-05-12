@@ -5,7 +5,7 @@ import Icon from "@/components/ui/icon";
 const CATALOG_API_URL = "https://functions.poehali.dev/15c8aecd-d37b-4aed-abce-dc0748135610";
 const VISIBLE = 4;
 
-interface Deal {
+interface NewProduct {
   id: number;
   name: string;
   price: number;
@@ -14,26 +14,18 @@ interface Deal {
   in_stock: boolean;
 }
 
-function getEndOfDay() {
-  const now = new Date();
-  const end = new Date(now);
-  end.setHours(23, 59, 59, 0);
-  return Math.floor((end.getTime() - now.getTime()) / 1000);
-}
-
-function DealCard({ p, navigate }: { p: Deal; navigate: ReturnType<typeof useNavigate> }) {
+function NewCard({ p, navigate, cardWidth }: { p: NewProduct; navigate: ReturnType<typeof useNavigate>; cardWidth: number }) {
+  const [imgError, setImgError] = useState(false);
   const discount = p.old_price && p.old_price > p.price
     ? Math.round((1 - p.price / p.old_price) * 100)
     : 0;
-  const [imgError, setImgError] = useState(false);
-
   return (
     <div
       onClick={() => navigate(`/product/${p.id}`)}
       className="flex-shrink-0 px-1.5"
-      style={{ width: `${100 / VISIBLE}%` }}
+      style={{ width: `${cardWidth}%` }}
     >
-      <div className="border border-[#e8e8e8] rounded-2xl overflow-hidden hover:border-[#f47d20] hover:shadow-sm transition-all cursor-pointer group p-3 flex flex-col gap-2 h-full">
+      <div className="border border-[#e8e8e8] rounded-2xl overflow-hidden hover:border-[#e31e24] hover:shadow-sm transition-all cursor-pointer p-3 flex flex-col gap-2 h-full">
         <div className="relative flex items-center justify-center bg-white rounded-xl overflow-hidden" style={{ height: 120 }}>
           <img
             src={imgError || !p.image ? `https://picsum.photos/seed/${p.id}/300/300` : p.image}
@@ -41,10 +33,9 @@ function DealCard({ p, navigate }: { p: Deal; navigate: ReturnType<typeof useNav
             className="h-full w-full object-cover"
             onError={() => setImgError(true)}
           />
+          <span className="absolute top-2 left-2 bg-[#e31e24] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">NEW</span>
           {discount > 0 && (
-            <span className="absolute bottom-2 left-2 bg-[#f47d20] text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
-              -{discount}%
-            </span>
+            <span className="absolute bottom-2 left-2 bg-orange-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full">-{discount}%</span>
           )}
           {!p.in_stock && (
             <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
@@ -64,34 +55,23 @@ function DealCard({ p, navigate }: { p: Deal; navigate: ReturnType<typeof useNav
   );
 }
 
-export default function ServiceclickDailyDeals() {
+export default function ServiceclickNewArrivals() {
   const navigate = useNavigate();
-  const [deals, setDeals] = useState<Deal[]>([]);
+  const [items, setItems] = useState<NewProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [offset, setOffset] = useState(0);
   const [animating, setAnimating] = useState(false);
   const [direction, setDirection] = useState<"next" | "prev">("next");
-  const [seconds, setSeconds] = useState(getEndOfDay);
 
   useEffect(() => {
-    fetch(`${CATALOG_API_URL}?action=featured&section=daily`)
+    fetch(`${CATALOG_API_URL}?action=featured&section=new`)
       .then(r => r.json())
-      .then(d => setDeals(d.items || []))
-      .catch(() => setDeals([]))
+      .then(d => setItems(d.items || []))
+      .catch(() => setItems([]))
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    const t = setInterval(() => setSeconds(s => s <= 0 ? getEndOfDay() : s - 1), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  const hours = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  const fmt = (v: number) => String(v).padStart(2, "0");
-
-  const maxOffset = Math.max(0, deals.length - VISIBLE);
+  const maxOffset = Math.max(0, items.length - VISIBLE);
 
   const slide = (dir: "next" | "prev") => {
     if (animating) return;
@@ -102,7 +82,7 @@ export default function ServiceclickDailyDeals() {
     setTimeout(() => { setOffset(o => dir === "next" ? o + 1 : o - 1); setAnimating(false); }, 300);
   };
 
-  if (loading || deals.length === 0) return null;
+  if (loading || items.length === 0) return null;
 
   const cardWidth = 100 / VISIBLE;
   const translateX = animating
@@ -112,15 +92,11 @@ export default function ServiceclickDailyDeals() {
   return (
     <div className="max-w-[1200px] mx-auto px-4 py-3">
       <div className="bg-white rounded-2xl px-5 py-4">
-        <div className="flex items-center gap-3 mb-4">
-          <h2 className="text-xl font-bold text-[#f47d20]">Товары дня</h2>
-          <div className="flex items-center gap-1">
-            <span className="bg-[#f47d20] text-white text-sm font-bold px-2 py-0.5 rounded-md tabular-nums">{fmt(hours)}</span>
-            <span className="text-[#f47d20] font-bold">:</span>
-            <span className="bg-[#f47d20] text-white text-sm font-bold px-2 py-0.5 rounded-md tabular-nums">{fmt(mins)}</span>
-            <span className="text-[#f47d20] font-bold">:</span>
-            <span className="bg-[#f47d20] text-white text-sm font-bold px-2 py-0.5 rounded-md tabular-nums">{fmt(secs)}</span>
-          </div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-[#e31e24] flex items-center gap-2">
+            <Icon name="Sparkles" size={20} className="text-[#e31e24]" />
+            Новинки
+          </h2>
         </div>
 
         <div className="relative overflow-hidden">
@@ -128,24 +104,16 @@ export default function ServiceclickDailyDeals() {
             className="flex"
             style={{ transform: `translateX(${translateX}%)`, transition: animating ? "transform 300ms cubic-bezier(0.25,0.46,0.45,0.94)" : "none" }}
           >
-            {deals.map(p => <DealCard key={p.id} p={p} navigate={navigate} />)}
+            {items.map(p => <NewCard key={p.id} p={p} navigate={navigate} cardWidth={cardWidth} />)}
           </div>
         </div>
 
-        {deals.length > VISIBLE && (
+        {items.length > VISIBLE && (
           <div className="flex justify-end gap-2 mt-3">
-            <button
-              onClick={() => slide("prev")}
-              disabled={offset === 0}
-              className="w-8 h-8 rounded-full border border-[#e8e8e8] flex items-center justify-center text-gray-500 hover:border-[#f47d20] hover:text-[#f47d20] transition-colors disabled:opacity-30"
-            >
+            <button onClick={() => slide("prev")} disabled={offset === 0} className="w-8 h-8 rounded-full border border-[#e8e8e8] flex items-center justify-center text-gray-500 hover:border-[#e31e24] hover:text-[#e31e24] transition-colors disabled:opacity-30">
               <Icon name="ChevronLeft" size={16} />
             </button>
-            <button
-              onClick={() => slide("next")}
-              disabled={offset >= maxOffset}
-              className="w-8 h-8 rounded-full border border-[#e8e8e8] flex items-center justify-center text-gray-500 hover:border-[#f47d20] hover:text-[#f47d20] transition-colors disabled:opacity-30"
-            >
+            <button onClick={() => slide("next")} disabled={offset >= maxOffset} className="w-8 h-8 rounded-full border border-[#e8e8e8] flex items-center justify-center text-gray-500 hover:border-[#e31e24] hover:text-[#e31e24] transition-colors disabled:opacity-30">
               <Icon name="ChevronRight" size={16} />
             </button>
           </div>
