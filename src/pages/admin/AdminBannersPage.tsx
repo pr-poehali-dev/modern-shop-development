@@ -189,12 +189,14 @@ export default function AdminBannersPage() {
     } else {
       payload.image_url = imagePreview || "";
     }
+    console.log("[save] method=", method, "token=", token, "payload=", JSON.stringify(payload).slice(0, 200));
     const res = await fetch(`${ADMIN_API_URL}?action=banners`, {
       method,
       headers: { "Content-Type": "application/json", "X-Admin-Token": token! },
       body: JSON.stringify(payload),
     });
     const data = await res.json();
+    console.log("[save] response status=", res.status, "data=", data);
     if (data.image_url) setImagePreview(data.image_url);
     setSaving(false);
     setUploading(false);

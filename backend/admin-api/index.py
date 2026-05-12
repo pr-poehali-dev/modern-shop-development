@@ -26,12 +26,11 @@ import urllib.request
 import urllib.error
 
 
+SCHEMA = 't_p9295853_modern_shop_developm'
+
 def get_db():
-    dsn = os.environ['DATABASE_URL']
-    if 'options=' not in dsn:
-        sep = '&' if '?' in dsn else '?'
-        dsn = dsn + sep + 'options=-csearch_path%3Dt_p9295853_modern_shop_developm'
-    return psycopg2.connect(dsn)
+    conn = psycopg2.connect(os.environ['DATABASE_URL'], options=f'-c search_path={SCHEMA}')
+    return conn
 
 
 def ok(data, status=200):
