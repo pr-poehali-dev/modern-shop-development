@@ -218,7 +218,7 @@ export default function ServiceclickNav() {
                   {cat.parent_id && (
                     <Icon name="CornerDownRight" size={12} className="text-gray-500 flex-shrink-0" />
                   )}
-                  <span className="truncate">{cat.name}</span>
+                  <span className="break-words whitespace-normal">{cat.name}</span>
                 </button>
               ))}
             </>
@@ -245,7 +245,7 @@ export default function ServiceclickNav() {
                     }}
                     className="flex-1 flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-[#3a3a3a] hover:text-[#e31e24] transition-colors text-left"
                   >
-                    <span className="truncate">{cat.name}</span>
+                    <span className="break-words whitespace-normal">{cat.name}</span>
                     {!hasChildren && cat.count > 0 && (
                       <span className="text-[10px] text-gray-500 ml-2 flex-shrink-0">{cat.count}</span>
                     )}
@@ -274,7 +274,7 @@ export default function ServiceclickNav() {
                         onClick={() => handleCategoryClick(child)}
                         className="w-full flex items-center justify-between pl-8 pr-4 py-2 text-[13px] text-gray-300 hover:bg-[#3a3a3a] hover:text-[#e31e24] transition-colors border-b border-[#383838] text-left"
                       >
-                        <span className="truncate">{child.name}</span>
+                        <span className="break-words whitespace-normal">{child.name}</span>
                         {child.count > 0 && (
                           <span className="text-[10px] text-gray-500 ml-2 flex-shrink-0">{child.count}</span>
                         )}
