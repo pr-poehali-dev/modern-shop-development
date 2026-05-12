@@ -26,10 +26,11 @@ export default function ServiceclickNav() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string | number>>(new Set());
+  const [search, setSearch] = useState("");
   const panelRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
-  // Загружаем категории при первом открытии
   useEffect(() => {
     if (open && categories.length === 0 && !loading) {
       setLoading(true);
@@ -39,9 +40,14 @@ export default function ServiceclickNav() {
         .catch(() => {})
         .finally(() => setLoading(false));
     }
+    if (open) {
+      setTimeout(() => searchRef.current?.focus(), 100);
+    } else {
+      setSearch("");
+      setExpandedIds(new Set());
+    }
   }, [open, categories.length, loading]);
 
-  // Закрываем по клику вне панели
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -53,7 +59,6 @@ export default function ServiceclickNav() {
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  const rootCats = categories.filter((c) => !c.parent_id);
   const childrenOf = (parentId: string | number) =>
     categories.filter((c) => String(c.parent_id) === String(parentId));
 
@@ -71,11 +76,26 @@ export default function ServiceclickNav() {
     navigate(`/catalog?category=${cat.id}`);
   };
 
+  const q = search.trim().toLowerCase();
+
+  // При поиске — показываем все совпадающие (включая дочерние) без иерархии
+  const isSearching = q.length > 0;
+
+  const filteredAll = isSearching
+    ? categories
+        .filter((c) => c.name.toLowerCase().includes(q))
+        .sort((a, b) => a.name.localeCompare(b.name, "ru"))
+    : [];
+
+  // Корневые категории, отсортированные по алфавиту
+  const rootCats = categories
+    .filter((c) => !c.parent_id)
+    .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+
   return (
     <>
       <nav className="bg-white border-b border-[#e0e0e0] relative z-50">
         <div className="max-w-[1200px] mx-auto px-4 flex items-center gap-6 h-11">
-          {/* Catalog trigger */}
           <button
             onClick={() => setOpen((v) => !v)}
             className={`flex items-center gap-2 font-semibold text-sm h-11 px-1 transition-colors ${
@@ -87,7 +107,6 @@ export default function ServiceclickNav() {
             <Icon name={open ? "ChevronUp" : "ChevronDown"} size={14} />
           </button>
 
-          {/* Nav links */}
           {navLinks.map((link) => (
             <a
               key={link}
@@ -104,7 +123,6 @@ export default function ServiceclickNav() {
         </div>
       </nav>
 
-      {/* Overlay */}
       {open && (
         <div
           className="fixed inset-0 z-40 bg-black/20"
@@ -112,13 +130,12 @@ export default function ServiceclickNav() {
         />
       )}
 
-      {/* Side panel */}
       <div
         ref={panelRef}
         className={`fixed top-0 left-0 h-full z-50 bg-[#2d2d2d] shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
-        style={{ width: 280 }}
+        style={{ width: 300 }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 h-12 bg-[#e31e24] flex-shrink-0">
@@ -134,16 +151,45 @@ export default function ServiceclickNav() {
           </button>
         </div>
 
-        {/* "All catalog" link */}
-        <button
-          onClick={() => { setOpen(false); navigate("/catalog"); }}
-          className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-[#e31e24] hover:bg-[#3a3a3a] border-b border-[#444] transition-colors text-left"
-        >
-          <Icon name="List" size={15} />
-          Все товары
-        </button>
+        {/* Search */}
+        <div className="px-3 py-2 border-b border-[#444] flex-shrink-0">
+          <div className="relative">
+            <Icon
+              name="Search"
+              size={14}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+            />
+            <input
+              ref={searchRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Поиск категории..."
+              className="w-full bg-[#3a3a3a] text-gray-200 text-sm placeholder-gray-500 rounded pl-8 pr-8 py-1.5 outline-none focus:ring-1 focus:ring-[#e31e24]"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200"
+              >
+                <Icon name="X" size={13} />
+              </button>
+            )}
+          </div>
+        </div>
 
-        {/* Categories list */}
+        {/* All catalog */}
+        {!isSearching && (
+          <button
+            onClick={() => { setOpen(false); navigate("/catalog"); }}
+            className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-[#e31e24] hover:bg-[#3a3a3a] border-b border-[#444] transition-colors text-left flex-shrink-0"
+          >
+            <Icon name="List" size={15} />
+            Все товары
+          </button>
+        )}
+
+        {/* Categories */}
         <div className="flex-1 overflow-y-auto">
           {loading && (
             <div className="flex flex-col gap-1 p-3">
@@ -157,8 +203,32 @@ export default function ServiceclickNav() {
             <p className="text-xs text-gray-400 px-4 py-4">Категории не найдены</p>
           )}
 
-          {!loading && rootCats.map((cat) => {
-            const children = childrenOf(cat.id);
+          {/* Search results — flat list */}
+          {!loading && isSearching && (
+            <>
+              {filteredAll.length === 0 && (
+                <p className="text-xs text-gray-400 px-4 py-4">Ничего не найдено</p>
+              )}
+              {filteredAll.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => handleCategoryClick(cat)}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-200 hover:bg-[#3a3a3a] hover:text-[#e31e24] transition-colors border-b border-[#444] text-left"
+                >
+                  {cat.parent_id && (
+                    <Icon name="CornerDownRight" size={12} className="text-gray-500 flex-shrink-0" />
+                  )}
+                  <span className="truncate">{cat.name}</span>
+                </button>
+              ))}
+            </>
+          )}
+
+          {/* Normal hierarchical list */}
+          {!loading && !isSearching && rootCats.map((cat) => {
+            const children = childrenOf(cat.id).sort((a, b) =>
+              a.name.localeCompare(b.name, "ru")
+            );
             const hasChildren = children.length > 0;
             const isExpanded = expandedIds.has(cat.id);
 
@@ -166,26 +236,38 @@ export default function ServiceclickNav() {
               <div key={cat.id}>
                 <div className="flex items-stretch border-b border-[#444]">
                   <button
-                    onClick={() => handleCategoryClick(cat)}
+                    onClick={() => {
+                      if (hasChildren) {
+                        toggleExpand(cat.id);
+                      } else {
+                        handleCategoryClick(cat);
+                      }
+                    }}
                     className="flex-1 flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-[#3a3a3a] hover:text-[#e31e24] transition-colors text-left"
                   >
                     <span className="truncate">{cat.name}</span>
                     {!hasChildren && cat.count > 0 && (
                       <span className="text-[10px] text-gray-500 ml-2 flex-shrink-0">{cat.count}</span>
                     )}
+                    {hasChildren && (
+                      <Icon
+                        name={isExpanded ? "ChevronUp" : "ChevronDown"}
+                        size={13}
+                        className="ml-2 flex-shrink-0 text-gray-400"
+                      />
+                    )}
                   </button>
-                  {hasChildren && (
-                    <button
-                      onClick={() => toggleExpand(cat.id)}
-                      className="px-3 text-gray-400 hover:text-[#e31e24] hover:bg-[#3a3a3a] transition-colors flex-shrink-0 flex items-center"
-                    >
-                      <Icon name={isExpanded ? "ChevronUp" : "ChevronDown"} size={13} />
-                    </button>
-                  )}
                 </div>
 
                 {hasChildren && isExpanded && (
                   <div className="bg-[#252525]">
+                    <button
+                      onClick={() => handleCategoryClick(cat)}
+                      className="w-full flex items-center gap-2 pl-8 pr-4 py-2 text-[13px] text-[#e31e24] hover:bg-[#3a3a3a] transition-colors border-b border-[#383838] text-left"
+                    >
+                      <Icon name="Layers" size={12} className="flex-shrink-0" />
+                      <span>Все в «{cat.name}»</span>
+                    </button>
                     {children.map((child) => (
                       <button
                         key={child.id}
