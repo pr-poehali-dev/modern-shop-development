@@ -665,7 +665,9 @@ def handler(event: dict, context) -> dict:
         return handle_categories()
 
     # Защищённые маршруты
+    print(f"[DEBUG] method={method} action={action} headers_keys={list(headers.keys())} body_keys={list(body.keys()) if body else []}")
     user = verify_token(headers)
+    print(f"[DEBUG] user={user}")
     if not user:
         return err('Не авторизован', 401)
 
