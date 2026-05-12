@@ -39,10 +39,100 @@ interface SearchProduct {
   sku: string;
 }
 
+const SYNC_STAGES = [
+  { label: "Подключение к CRM", duration: 1200 },
+  { label: "Загрузка категорий", duration: 1800 },
+  { label: "Загрузка товаров", duration: 0 },
+  { label: "Обновление остатков", duration: 0 },
+  { label: "Сохранение в базу", duration: 1500 },
+];
+
+function SyncProgressBar({ syncing, syncedCount }: { syncing: boolean; syncedCount: number | null }) {
+  const [stage, setStage] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [dots, setDots] = useState("");
+
+  useEffect(() => {
+    if (!syncing) { setStage(0); setElapsed(0); return; }
+    setStage(0);
+    setElapsed(0);
+
+    let s = 0;
+    const advance = () => {
+      const next = s + 1;
+      if (next < SYNC_STAGES.length) {
+        s = next;
+        setStage(next);
+        const dur = SYNC_STAGES[next].duration;
+        if (dur > 0) setTimeout(advance, dur);
+      }
+    };
+    const dur0 = SYNC_STAGES[0].duration;
+    if (dur0 > 0) setTimeout(advance, dur0);
+
+    const timer = setInterval(() => setElapsed(e => e + 1), 1000);
+    return () => clearInterval(timer);
+  }, [syncing]);
+
+  useEffect(() => {
+    if (!syncing) return;
+    const t = setInterval(() => setDots(d => d.length >= 3 ? "" : d + "."), 500);
+    return () => clearInterval(t);
+  }, [syncing]);
+
+  if (!syncing) return null;
+
+  const progress = Math.min(95, ((stage + 1) / SYNC_STAGES.length) * 100);
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  const timeStr = mins > 0 ? `${mins}м ${secs}с` : `${secs}с`;
+
+  return (
+    <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded-full border-2 border-blue-300 border-t-blue-600 animate-spin flex-shrink-0" />
+          <span className="text-sm font-semibold text-blue-800">
+            {SYNC_STAGES[stage]?.label}{dots}
+          </span>
+        </div>
+        <span className="text-xs text-blue-500 tabular-nums">{timeStr}</span>
+      </div>
+
+      {/* Прогресс-бар */}
+      <div className="h-2 bg-blue-100 rounded-full overflow-hidden mb-3">
+        <div
+          className="h-full bg-blue-500 rounded-full transition-all duration-700 ease-out"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+
+      {/* Этапы */}
+      <div className="flex gap-1.5 flex-wrap">
+        {SYNC_STAGES.map((s, i) => (
+          <div key={i} className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all ${
+            i < stage ? "bg-blue-500 text-white" :
+            i === stage ? "bg-blue-200 text-blue-800 font-medium" :
+            "bg-blue-100/50 text-blue-400"
+          }`}>
+            {i < stage ? <Icon name="Check" size={10} /> : i === stage ? <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" /> : <div className="w-2 h-2 rounded-full bg-blue-200" />}
+            {s.label}
+          </div>
+        ))}
+      </div>
+
+      {syncedCount !== null && syncedCount > 0 && (
+        <p className="text-xs text-blue-600 mt-2 font-medium">Обработано товаров: {syncedCount.toLocaleString("ru")}</p>
+      )}
+    </div>
+  );
+}
+
 function SyncTab({ token }: { token: string }) {
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [syncedCount, setSyncedCount] = useState<number | null>(null);
   const [times, setTimes] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -66,7 +156,7 @@ function SyncTab({ token }: { token: string }) {
 
   const handleSync = async () => {
     setSyncing(true);
-    toast.info("Синхронизация запущена... Это может занять несколько минут");
+    setSyncedCount(null);
     try {
       const res = await fetch(`${CATALOG_API_URL}?action=sync`, {
         method: "POST",
@@ -75,12 +165,13 @@ function SyncTab({ token }: { token: string }) {
       });
       const data = await res.json();
       if (data.ok) {
-        toast.success(`Синхронизировано ${data.synced} товаров`);
+        setSyncedCount(data.synced);
+        toast.success(`Готово! Синхронизировано ${data.synced} товаров`);
         load();
       } else {
         toast.error(data.error || "Ошибка синхронизации");
       }
-    } catch (e) {
+    } catch {
       toast.error("Ошибка соединения");
     } finally {
       setSyncing(false);
@@ -159,6 +250,7 @@ function SyncTab({ token }: { token: string }) {
             <b>Ошибка:</b> {status.last_sync_error}
           </div>
         )}
+        <SyncProgressBar syncing={syncing} syncedCount={syncedCount} />
         <button
           onClick={handleSync}
           disabled={syncing}
