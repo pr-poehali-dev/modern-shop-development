@@ -104,11 +104,11 @@ def fetch_crm_categories():
     return raw.get('items') or raw.get('categories') or []
 
 
-def run_sync():
+def sync_categories():
+    """Синхронизирует категории из CRM."""
     conn = get_db()
     cur = conn.cursor()
-    synced = 0
-
+    count = 0
     try:
         cats = fetch_crm_categories()
         for cat in cats:
@@ -121,69 +121,79 @@ def run_sync():
                    ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, parent_id=EXCLUDED.parent_id, synced_at=NOW()""",
                 (int(cid), cat.get('name', ''), int(cat['parent_id']) if cat.get('parent_id') else None)
             )
+            count += 1
         conn.commit()
-    except Exception as e:
-        print(f"[catalog-sync] categories error: {e}")
+    finally:
+        conn.close()
+    return count
 
-    page = 1
-    total_pages = 1
-    while page <= total_pages:
-        try:
-            items, total_pages = fetch_crm_page(page)
-            for p in items:
-                pid = p.get('id')
-                if not pid:
+
+def sync_page(page):
+    """Синхронизирует одну страницу товаров из CRM. Возвращает (synced, total_pages)."""
+    items, total_pages = fetch_crm_page(page)
+    conn = get_db()
+    cur = conn.cursor()
+    synced = 0
+    try:
+        for p in items:
+            pid = p.get('id')
+            if not pid:
+                continue
+            pid = int(pid)
+            price = float(p.get('price') or 0)
+            old_price = float(p.get('old_price') or 0) or None
+            category_id = p.get('category_id')
+
+            cur.execute(
+                """INSERT INTO catalog_products (id, name, sku, price, old_price, image_url, description, category_id, category_name, unit, is_active, synced_at, updated_at)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TRUE,NOW(),NOW())
+                   ON CONFLICT (id) DO UPDATE SET
+                     name=EXCLUDED.name, sku=EXCLUDED.sku, price=EXCLUDED.price,
+                     old_price=EXCLUDED.old_price, image_url=EXCLUDED.image_url,
+                     description=EXCLUDED.description, category_id=EXCLUDED.category_id,
+                     category_name=EXCLUDED.category_name, unit=EXCLUDED.unit,
+                     is_active=TRUE, synced_at=NOW(), updated_at=NOW()""",
+                (pid, p.get('name') or '', p.get('sku') or p.get('article') or '',
+                 price, old_price, p.get('image') or p.get('image_url') or '',
+                 p.get('description') or '',
+                 int(category_id) if category_id else None,
+                 p.get('category_name') or '', p.get('unit') or 'шт')
+            )
+
+            for s in (p.get('stock_by_store') or []):
+                store_id = s.get('store_id')
+                if store_id is None:
                     continue
-                pid = int(pid)
-                price = float(p.get('price') or 0)
-                old_price = float(p.get('old_price') or 0) or None
-                category_id = p.get('category_id')
-
                 cur.execute(
-                    """INSERT INTO catalog_products (id, name, sku, price, old_price, image_url, description, category_id, category_name, unit, is_active, synced_at, updated_at)
-                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TRUE,NOW(),NOW())
-                       ON CONFLICT (id) DO UPDATE SET
-                         name=EXCLUDED.name, sku=EXCLUDED.sku, price=EXCLUDED.price,
-                         old_price=EXCLUDED.old_price, image_url=EXCLUDED.image_url,
-                         description=EXCLUDED.description, category_id=EXCLUDED.category_id,
-                         category_name=EXCLUDED.category_name, unit=EXCLUDED.unit,
-                         is_active=TRUE, synced_at=NOW(), updated_at=NOW()""",
-                    (pid, p.get('name') or '', p.get('sku') or p.get('article') or '',
-                     price, old_price, p.get('image') or p.get('image_url') or '',
-                     p.get('description') or '',
-                     int(category_id) if category_id else None,
-                     p.get('category_name') or '', p.get('unit') or 'шт')
+                    """INSERT INTO catalog_stock (product_id, store_id, store_name, quantity, updated_at)
+                       VALUES (%s,%s,%s,%s,NOW())
+                       ON CONFLICT (product_id, store_id) DO UPDATE SET
+                         store_name=EXCLUDED.store_name, quantity=EXCLUDED.quantity, updated_at=NOW()""",
+                    (pid, int(store_id), s.get('store_name') or '', int(s.get('quantity') or 0))
                 )
+            synced += 1
 
-                for s in (p.get('stock_by_store') or []):
-                    store_id = s.get('store_id')
-                    if store_id is None:
-                        continue
-                    cur.execute(
-                        """INSERT INTO catalog_stock (product_id, store_id, store_name, quantity, updated_at)
-                           VALUES (%s,%s,%s,%s,NOW())
-                           ON CONFLICT (product_id, store_id) DO UPDATE SET
-                             store_name=EXCLUDED.store_name, quantity=EXCLUDED.quantity, updated_at=NOW()""",
-                        (pid, int(store_id), s.get('store_name') or '', int(s.get('quantity') or 0))
-                    )
-                synced += 1
+        conn.commit()
+        print(f"[catalog-sync] page {page}/{total_pages}, synced: {synced}")
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        raise e
+    conn.close()
+    return synced, total_pages
 
-            conn.commit()
-            print(f"[catalog-sync] page {page}/{total_pages}, synced: {synced}")
-            page += 1
-        except Exception as e:
-            print(f"[catalog-sync] error on page {page}: {e}")
-            conn.rollback()
-            break
 
+def finish_sync(total_synced):
+    """Обновляет статус после завершения синхронизации."""
+    conn = get_db()
+    cur = conn.cursor()
     cur.execute(
         """UPDATE catalog_sync_schedule SET last_sync_at=NOW(), last_sync_status='ok', last_sync_count=%s, last_sync_error=NULL, updated_at=NOW()
            WHERE id=(SELECT id FROM catalog_sync_schedule ORDER BY id LIMIT 1)""",
-        (synced,)
+        (total_synced,)
     )
     conn.commit()
     conn.close()
-    return synced
 
 
 def handler(event: dict, context) -> dict:
@@ -205,7 +215,7 @@ def handler(event: dict, context) -> dict:
 
     # POST: защищённые
     if method == 'POST':
-        if action in ('sync', 'update_schedule'):
+        if action in ('sync', 'sync_categories', 'sync_page', 'sync_finish', 'update_schedule'):
             if not verify_admin_token(headers):
                 return err('Не авторизован', 401)
 
@@ -224,10 +234,38 @@ def handler(event: dict, context) -> dict:
             conn.close()
             return ok({'ok': True})
 
-        if action == 'sync':
+        if action == 'sync_categories':
             try:
-                count = run_sync()
-                return ok({'ok': True, 'synced': count})
+                count = sync_categories()
+                return ok({'ok': True, 'count': count})
+            except Exception as e:
+                return err(f'Ошибка загрузки категорий: {e}', 500)
+
+        if action == 'sync_page':
+            page = int(body.get('page', 1))
+            try:
+                synced, total_pages = sync_page(page)
+                return ok({'ok': True, 'synced': synced, 'page': page, 'total_pages': total_pages})
+            except Exception as e:
+                return err(f'Ошибка загрузки страницы {page}: {e}', 500)
+
+        if action == 'sync_finish':
+            total_synced = int(body.get('total_synced', 0))
+            try:
+                finish_sync(total_synced)
+                return ok({'ok': True})
+            except Exception as e:
+                return err(f'Ошибка завершения: {e}', 500)
+
+        if action == 'sync':
+            # Оставляем для совместимости — синхронизирует только первую страницу
+            try:
+                sync_categories()
+                synced, total_pages = sync_page(1)
+                if total_pages == 1:
+                    finish_sync(synced)
+                    return ok({'ok': True, 'synced': synced, 'total_pages': 1})
+                return ok({'ok': True, 'synced': synced, 'total_pages': total_pages, 'page': 1})
             except Exception as e:
                 try:
                     conn = get_db()

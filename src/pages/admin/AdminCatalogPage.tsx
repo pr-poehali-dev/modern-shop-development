@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAdminAuth, ADMIN_API_URL } from "@/admin/AdminAuth";
 import Icon from "@/components/ui/icon";
 import { toast } from "sonner";
@@ -39,103 +39,101 @@ interface SearchProduct {
   sku: string;
 }
 
-const SYNC_STAGES = [
-  { label: "Подключение к CRM", duration: 1200 },
-  { label: "Загрузка категорий", duration: 1800 },
-  { label: "Загрузка товаров", duration: 0 },
-  { label: "Обновление остатков", duration: 0 },
-  { label: "Сохранение в базу", duration: 1500 },
-];
+interface SyncProgress {
+  stage: "idle" | "categories" | "products" | "finish" | "done" | "error";
+  page: number;
+  totalPages: number;
+  synced: number;
+  elapsed: number;
+  error?: string;
+}
 
-function SyncProgressBar({ syncing, syncedCount }: { syncing: boolean; syncedCount: number | null }) {
-  const [stage, setStage] = useState(0);
-  const [elapsed, setElapsed] = useState(0);
+function SyncProgressBar({ progress }: { progress: SyncProgress }) {
   const [dots, setDots] = useState("");
 
   useEffect(() => {
-    if (!syncing) { setStage(0); setElapsed(0); return; }
-    setStage(0);
-    setElapsed(0);
-
-    let s = 0;
-    const advance = () => {
-      const next = s + 1;
-      if (next < SYNC_STAGES.length) {
-        s = next;
-        setStage(next);
-        const dur = SYNC_STAGES[next].duration;
-        if (dur > 0) setTimeout(advance, dur);
-      }
-    };
-    const dur0 = SYNC_STAGES[0].duration;
-    if (dur0 > 0) setTimeout(advance, dur0);
-
-    const timer = setInterval(() => setElapsed(e => e + 1), 1000);
-    return () => clearInterval(timer);
-  }, [syncing]);
-
-  useEffect(() => {
-    if (!syncing) return;
+    if (progress.stage === "idle" || progress.stage === "done" || progress.stage === "error") return;
     const t = setInterval(() => setDots(d => d.length >= 3 ? "" : d + "."), 500);
     return () => clearInterval(t);
-  }, [syncing]);
+  }, [progress.stage]);
 
-  if (!syncing) return null;
+  if (progress.stage === "idle") return null;
 
-  const progress = Math.min(95, ((stage + 1) / SYNC_STAGES.length) * 100);
-  const mins = Math.floor(elapsed / 60);
-  const secs = elapsed % 60;
+  const mins = Math.floor(progress.elapsed / 60);
+  const secs = progress.elapsed % 60;
   const timeStr = mins > 0 ? `${mins}м ${secs}с` : `${secs}с`;
 
+  const pct = progress.stage === "categories" ? 5
+    : progress.stage === "products" && progress.totalPages > 0
+      ? 5 + Math.round((progress.page / progress.totalPages) * 90)
+    : progress.stage === "finish" ? 97
+    : progress.stage === "done" ? 100
+    : 5;
+
+  const stageLabel =
+    progress.stage === "categories" ? `Загрузка категорий${dots}` :
+    progress.stage === "products" ? `Страница ${progress.page} из ${progress.totalPages || "?"}${dots}` :
+    progress.stage === "finish" ? `Завершение${dots}` :
+    progress.stage === "done" ? "Готово!" :
+    progress.stage === "error" ? "Ошибка" : "";
+
+  const isActive = progress.stage !== "done" && progress.stage !== "error";
+
   return (
-    <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 mb-4">
+    <div className={`rounded-2xl p-5 mb-4 border ${progress.stage === "error" ? "bg-red-50 border-red-200" : progress.stage === "done" ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-100"}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full border-2 border-blue-300 border-t-blue-600 animate-spin flex-shrink-0" />
-          <span className="text-sm font-semibold text-blue-800">
-            {SYNC_STAGES[stage]?.label}{dots}
+          {isActive && <div className="w-4 h-4 rounded-full border-2 border-blue-300 border-t-blue-600 animate-spin flex-shrink-0" />}
+          {progress.stage === "done" && <Icon name="CheckCircle" size={16} className="text-green-500 flex-shrink-0" />}
+          {progress.stage === "error" && <Icon name="AlertCircle" size={16} className="text-red-500 flex-shrink-0" />}
+          <span className={`text-sm font-semibold ${progress.stage === "error" ? "text-red-700" : progress.stage === "done" ? "text-green-700" : "text-blue-800"}`}>
+            {stageLabel}
           </span>
         </div>
-        <span className="text-xs text-blue-500 tabular-nums">{timeStr}</span>
+        <span className={`text-xs tabular-nums ${progress.stage === "done" ? "text-green-500" : "text-blue-400"}`}>{timeStr}</span>
       </div>
 
-      {/* Прогресс-бар */}
-      <div className="h-2 bg-blue-100 rounded-full overflow-hidden mb-3">
+      <div className={`h-2.5 rounded-full overflow-hidden mb-3 ${progress.stage === "error" ? "bg-red-100" : progress.stage === "done" ? "bg-green-100" : "bg-blue-100"}`}>
         <div
-          className="h-full bg-blue-500 rounded-full transition-all duration-700 ease-out"
-          style={{ width: `${progress}%` }}
+          className={`h-full rounded-full transition-all duration-500 ease-out ${progress.stage === "error" ? "bg-red-400" : progress.stage === "done" ? "bg-green-500" : "bg-blue-500"}`}
+          style={{ width: `${pct}%` }}
         />
       </div>
 
-      {/* Этапы */}
-      <div className="flex gap-1.5 flex-wrap">
-        {SYNC_STAGES.map((s, i) => (
-          <div key={i} className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all ${
-            i < stage ? "bg-blue-500 text-white" :
-            i === stage ? "bg-blue-200 text-blue-800 font-medium" :
-            "bg-blue-100/50 text-blue-400"
-          }`}>
-            {i < stage ? <Icon name="Check" size={10} /> : i === stage ? <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" /> : <div className="w-2 h-2 rounded-full bg-blue-200" />}
-            {s.label}
-          </div>
-        ))}
+      <div className="flex items-center justify-between text-xs">
+        <div className="flex gap-3">
+          <span className={`flex items-center gap-1 ${progress.stage !== "categories" && progress.synced === 0 && progress.stage === "categories" ? "text-blue-600 font-medium" : "text-blue-400"}`}>
+            <Icon name="Tag" size={11} /> Категории
+          </span>
+          <span className={`flex items-center gap-1 ${progress.stage === "products" ? "text-blue-700 font-semibold" : progress.stage === "finish" || progress.stage === "done" ? "text-blue-400" : "text-gray-300"}`}>
+            <Icon name="Package" size={11} /> Товары
+          </span>
+          <span className={`flex items-center gap-1 ${progress.stage === "finish" || progress.stage === "done" ? "text-blue-400" : "text-gray-300"}`}>
+            <Icon name="Database" size={11} /> Сохранение
+          </span>
+        </div>
+        {progress.synced > 0 && (
+          <span className="text-blue-600 font-medium">{progress.synced.toLocaleString("ru")} товаров</span>
+        )}
       </div>
 
-      {syncedCount !== null && syncedCount > 0 && (
-        <p className="text-xs text-blue-600 mt-2 font-medium">Обработано товаров: {syncedCount.toLocaleString("ru")}</p>
+      {progress.stage === "error" && progress.error && (
+        <p className="text-xs text-red-600 mt-2 bg-red-100 rounded-lg px-3 py-2">{progress.error}</p>
       )}
     </div>
   );
 }
 
+const IDLE_PROGRESS: SyncProgress = { stage: "idle", page: 0, totalPages: 0, synced: 0, elapsed: 0 };
+
 function SyncTab({ token }: { token: string }) {
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [syncedCount, setSyncedCount] = useState<number | null>(null);
+  const [progress, setProgress] = useState<SyncProgress>(IDLE_PROGRESS);
   const [times, setTimes] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -154,27 +152,57 @@ function SyncTab({ token }: { token: string }) {
 
   useEffect(() => { load(); }, [load]);
 
+  const post = async (action: string, body: object) => {
+    const res = await fetch(`${CATALOG_API_URL}?action=${action}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+      body: JSON.stringify(body),
+    });
+    return res.json();
+  };
+
   const handleSync = async () => {
-    setSyncing(true);
-    setSyncedCount(null);
+    // Запускаем таймер
+    let elapsed = 0;
+    timerRef.current = setInterval(() => {
+      elapsed += 1;
+      setProgress(p => ({ ...p, elapsed }));
+    }, 1000);
+
+    setProgress({ stage: "categories", page: 0, totalPages: 0, synced: 0, elapsed: 0 });
+
     try {
-      const res = await fetch(`${CATALOG_API_URL}?action=sync`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Admin-Token": token },
-        body: JSON.stringify({ action: "sync" }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setSyncedCount(data.synced);
-        toast.success(`Готово! Синхронизировано ${data.synced} товаров`);
-        load();
-      } else {
-        toast.error(data.error || "Ошибка синхронизации");
+      // 1. Категории
+      await post("sync_categories", {});
+
+      // 2. Страницы товаров
+      let page = 1;
+      let totalPages = 1;
+      let totalSynced = 0;
+
+      while (page <= totalPages) {
+        setProgress(p => ({ ...p, stage: "products", page, totalPages }));
+        const data = await post("sync_page", { page });
+        if (!data.ok) throw new Error(data.error || `Ошибка страницы ${page}`);
+        totalSynced += data.synced;
+        totalPages = data.total_pages;
+        setProgress(p => ({ ...p, page, totalPages, synced: totalSynced }));
+        page += 1;
       }
-    } catch {
-      toast.error("Ошибка соединения");
-    } finally {
-      setSyncing(false);
+
+      // 3. Финализация
+      setProgress(p => ({ ...p, stage: "finish" }));
+      await post("sync_finish", { total_synced: totalSynced });
+
+      if (timerRef.current) clearInterval(timerRef.current);
+      setProgress(p => ({ ...p, stage: "done", synced: totalSynced }));
+      toast.success(`Готово! Синхронизировано ${totalSynced} товаров`);
+      load();
+    } catch (e: unknown) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      const msg = e instanceof Error ? e.message : "Ошибка соединения";
+      setProgress(p => ({ ...p, stage: "error", error: msg }));
+      toast.error(msg);
     }
   };
 
@@ -250,13 +278,16 @@ function SyncTab({ token }: { token: string }) {
             <b>Ошибка:</b> {status.last_sync_error}
           </div>
         )}
-        <SyncProgressBar syncing={syncing} syncedCount={syncedCount} />
+        <SyncProgressBar progress={progress} />
         <button
-          onClick={handleSync}
-          disabled={syncing}
+          onClick={progress.stage === "idle" || progress.stage === "done" || progress.stage === "error" ? handleSync : undefined}
+          disabled={progress.stage !== "idle" && progress.stage !== "done" && progress.stage !== "error"}
           className="w-full py-2.5 bg-[#e31e24] hover:bg-[#c41920] text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
         >
-          {syncing ? <><div className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" /> Синхронизируем...</> : <><Icon name="RefreshCw" size={15} /> Синхронизировать сейчас</>}
+          {progress.stage !== "idle" && progress.stage !== "done" && progress.stage !== "error"
+            ? <><div className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" /> Синхронизируем...</>
+            : <><Icon name="RefreshCw" size={15} /> {progress.stage === "done" ? "Синхронизировать снова" : "Синхронизировать сейчас"}</>
+          }
         </button>
       </div>
 
