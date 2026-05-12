@@ -27,7 +27,11 @@ import urllib.error
 
 
 def get_db():
-    return psycopg2.connect(os.environ['DATABASE_URL'])
+    dsn = os.environ['DATABASE_URL']
+    if 'options=' not in dsn:
+        sep = '&' if '?' in dsn else '?'
+        dsn = dsn + sep + 'options=-csearch_path%3Dt_p9295853_modern_shop_developm'
+    return psycopg2.connect(dsn)
 
 
 def ok(data, status=200):
