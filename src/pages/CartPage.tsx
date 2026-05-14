@@ -13,7 +13,7 @@ interface StockCheck {
   product_id: string;
   store_id: number;
   requested: number;
-  available: number;
+  available: number | null;
   ok: boolean;
 }
 
@@ -203,7 +203,9 @@ export default function CartPage() {
                         {stockIssue && (
                           <p className="text-xs text-orange-600 mt-1 flex items-center gap-1 font-medium">
                             <Icon name="AlertTriangle" size={11} />
-                            В наличии: {sc!.available} шт., запрошено: {sc!.requested} шт.
+                            {sc!.available !== null
+                              ? `В наличии: ${sc!.available} шт., запрошено: ${sc!.requested} шт.`
+                              : "Нет данных об остатке"}
                           </p>
                         )}
                         {qtyError && (

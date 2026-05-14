@@ -293,8 +293,12 @@ def handler(event: dict, context) -> dict:
                 qty = int(ci.get('quantity', 1))
                 cur.execute("SELECT quantity FROM catalog_stock WHERE product_id=%s AND store_id=%s", (int(pid), int(store_id)))
                 row = cur.fetchone()
-                available = row[0] if row else 0
-                results.append({'product_id': pid, 'store_id': store_id, 'requested': qty, 'available': available, 'ok': available >= qty})
+                if row is None:
+                    # Товар не найден в catalog_stock — данные неизвестны, не блокируем
+                    results.append({'product_id': pid, 'store_id': store_id, 'requested': qty, 'available': None, 'ok': True})
+                else:
+                    available = row[0]
+                    results.append({'product_id': pid, 'store_id': store_id, 'requested': qty, 'available': available, 'ok': available >= qty})
             conn.close()
             return ok({'items': results})
 
