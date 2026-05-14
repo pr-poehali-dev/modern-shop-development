@@ -153,12 +153,24 @@ function SyncTab({ token }: { token: string }) {
   useEffect(() => { load(); }, [load]);
 
   const post = async (action: string, body: object) => {
-    const res = await fetch(`${CATALOG_API_URL}?action=${action}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Admin-Token": token },
-      body: JSON.stringify(body),
-    });
-    return res.json();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 28000);
+    try {
+      const res = await fetch(`${CATALOG_API_URL}?action=${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      const data = await res.json();
+      if (!res.ok && !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      return data;
+    } catch (e: unknown) {
+      if (e instanceof Error && e.name === "AbortError") throw new Error("Превышено время ожидания ответа от сервера");
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
   };
 
   const handleSync = async () => {

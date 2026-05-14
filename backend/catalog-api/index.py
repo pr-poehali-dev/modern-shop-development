@@ -11,7 +11,7 @@ import urllib.request
 SCHEMA = 't_p9295853_modern_shop_developm'
 CRM_API_URL = "https://functions.poehali.dev/c7265605-961b-48cb-9594-4caad2cb333e"
 PER_PAGE = 24
-SYNC_PER_PAGE = 500
+SYNC_PER_PAGE = 100
 
 CORS_HEADERS = {
     'Access-Control-Allow-Origin': '*',
@@ -87,10 +87,11 @@ def load_stock_for_products(cur, product_ids):
 def fetch_crm_page(page):
     url = f"{CRM_API_URL}?action=products&per_page={SYNC_PER_PAGE}&page={page}"
     req = urllib.request.Request(url, headers={'Accept': 'application/json'})
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    with urllib.request.urlopen(req, timeout=20) as resp:
         raw = json.loads(resp.read().decode('utf-8'))
     if isinstance(raw.get('body'), str):
         raw = json.loads(raw['body'])
+    print(f"[fetch_crm_page] page={page} items={len(raw.get('items') or [])} pages={raw.get('pages')}")
     return raw.get('items') or [], int(raw.get('pages') or 1)
 
 
@@ -176,6 +177,7 @@ def sync_page(page):
         conn.commit()
         print(f"[catalog-sync] page {page}/{total_pages}, synced: {synced}")
     except Exception as e:
+        print(f"[sync_page] ERROR page={page}: {type(e).__name__}: {e}")
         conn.rollback()
         conn.close()
         raise e
