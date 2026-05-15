@@ -7,6 +7,7 @@ import json
 import os
 import psycopg2
 import urllib.request
+from datetime import datetime, timezone, timedelta
 
 SCHEMA = 't_p9295853_modern_shop_developm'
 CRM_API_URL = "https://functions.poehali.dev/c7265605-961b-48cb-9594-4caad2cb333e"
@@ -231,6 +232,138 @@ def log_sync_error(log_id, error_text):
     conn.close()
 
 
+def should_run_now(times: list, last_sync_at) -> bool:
+    """Проверяет, нужно ли запускать автосинхронизацию в текущий час (МСК)."""
+    now_msk = datetime.now(timezone.utc) + timedelta(hours=3)
+    current_hour = now_msk.strftime('%H:00')
+    scheduled_hours = {t.split(':')[0] + ':00' for t in times}
+    if current_hour not in scheduled_hours:
+        return False
+    if last_sync_at:
+        if last_sync_at.tzinfo is None:
+            last_sync_at = last_sync_at.replace(tzinfo=timezone.utc)
+        last_msk = last_sync_at + timedelta(hours=3)
+        if last_msk.strftime('%Y-%m-%d %H') == now_msk.strftime('%Y-%m-%d %H'):
+            print(f"[auto_sync] already synced this hour at {last_msk.strftime('%H:%M')}, skipping")
+            return False
+    print(f"[auto_sync] hour={current_hour}, scheduled={sorted(scheduled_hours)}, will run")
+    return True
+
+
+def run_full_sync_auto():
+    """Полная синхронизация всех страниц с записью в журнал (trigger_type=auto)."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO catalog_sync_log (trigger_type, status) VALUES ('auto', 'running') RETURNING id")
+    log_id = cur.fetchone()[0]
+    conn.commit()
+    conn.close()
+    print(f"[auto_sync] started, log_id={log_id}")
+
+    total_synced = 0
+    try:
+        # Категории
+        cats = fetch_crm_categories()
+        conn = get_db()
+        cur = conn.cursor()
+        for cat in cats:
+            cid = cat.get('id')
+            if not cid:
+                continue
+            cur.execute(
+                """INSERT INTO catalog_categories (id, name, parent_id, synced_at)
+                   VALUES (%s,%s,%s,NOW())
+                   ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, parent_id=EXCLUDED.parent_id, synced_at=NOW()""",
+                (int(cid), cat.get('name', ''), int(cat['parent_id']) if cat.get('parent_id') else None)
+            )
+        conn.commit()
+        conn.close()
+
+        # Все страницы товаров
+        page = 1
+        total_pages = 1
+        while page <= total_pages:
+            items, total_pages = fetch_crm_page(page)
+            conn = get_db()
+            cur = conn.cursor()
+            for p in items:
+                pid = p.get('id')
+                if not pid:
+                    continue
+                pid = int(pid)
+                price = float(p.get('price') or 0)
+                old_price = float(p.get('old_price') or 0) or None
+                category_id = p.get('category_id')
+                cur.execute(
+                    """INSERT INTO catalog_products (id, name, sku, price, old_price, image_url, description, category_id, category_name, unit, is_active, synced_at, updated_at)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TRUE,NOW(),NOW())
+                       ON CONFLICT (id) DO UPDATE SET
+                         name=EXCLUDED.name, sku=EXCLUDED.sku, price=EXCLUDED.price,
+                         old_price=EXCLUDED.old_price, image_url=EXCLUDED.image_url,
+                         description=EXCLUDED.description, category_id=EXCLUDED.category_id,
+                         category_name=EXCLUDED.category_name, unit=EXCLUDED.unit,
+                         is_active=TRUE, synced_at=NOW(), updated_at=NOW()""",
+                    (pid, p.get('name') or '', p.get('sku') or p.get('article') or '',
+                     price, old_price, p.get('image') or p.get('image_url') or '',
+                     p.get('description') or '',
+                     int(category_id) if category_id else None,
+                     p.get('category_name') or '', p.get('unit') or 'шт')
+                )
+                for s in (p.get('stock_by_store') or []):
+                    store_id = s.get('store_id')
+                    if store_id is None:
+                        continue
+                    cur.execute(
+                        """INSERT INTO catalog_stock (product_id, store_id, store_name, quantity, updated_at)
+                           VALUES (%s,%s,%s,%s,NOW())
+                           ON CONFLICT (product_id, store_id) DO UPDATE SET
+                             store_name=EXCLUDED.store_name, quantity=EXCLUDED.quantity, updated_at=NOW()""",
+                        (pid, int(store_id), s.get('store_name') or '', int(s.get('quantity') or 0))
+                    )
+                total_synced += 1
+            conn.commit()
+            conn.close()
+            print(f"[auto_sync] page {page}/{total_pages}, total_synced={total_synced}")
+            page += 1
+
+        # Финализация
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE catalog_sync_log SET finished_at=NOW(), status='ok', synced_count=%s WHERE id=%s",
+            (total_synced, log_id)
+        )
+        cur.execute(
+            """UPDATE catalog_sync_schedule SET last_sync_at=NOW(), last_sync_status='ok',
+               last_sync_count=%s, last_sync_error=NULL, updated_at=NOW()
+               WHERE id=(SELECT id FROM catalog_sync_schedule ORDER BY id LIMIT 1)""",
+            (total_synced,)
+        )
+        conn.commit()
+        conn.close()
+        print(f"[auto_sync] done, total_synced={total_synced}")
+        return total_synced
+
+    except Exception as e:
+        print(f"[auto_sync] ERROR: {type(e).__name__}: {e}")
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE catalog_sync_log SET finished_at=NOW(), status='error', error_text=%s WHERE id=%s",
+                (str(e)[:2000], log_id)
+            )
+            cur.execute(
+                "UPDATE catalog_sync_schedule SET last_sync_at=NOW(), last_sync_status='error', last_sync_error=%s, updated_at=NOW() WHERE id=(SELECT id FROM catalog_sync_schedule ORDER BY id LIMIT 1)",
+                (str(e)[:2000],)
+            )
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+        raise e
+
+
 def handler(event: dict, context) -> dict:
     """Каталог товаров из БД + синхронизация с CRM."""
     if event.get('httpMethod') == 'OPTIONS':
@@ -343,6 +476,27 @@ def handler(event: dict, context) -> dict:
                 except Exception:
                     pass
                 return err(f'Ошибка синхронизации: {e}', 500)
+
+        if action == 'auto_sync':
+            # Вызывается cron-триггером каждый час. Проверяет расписание и запускает синхронизацию.
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute("SELECT times, is_active, last_sync_at FROM catalog_sync_schedule ORDER BY id LIMIT 1")
+            row = cur.fetchone()
+            conn.close()
+            if not row:
+                return ok({'skipped': True, 'reason': 'no schedule'})
+            times_raw, is_active, last_sync_at = row
+            if not is_active:
+                return ok({'skipped': True, 'reason': 'disabled'})
+            times = times_raw if isinstance(times_raw, list) else json.loads(times_raw)
+            if not should_run_now(times, last_sync_at):
+                return ok({'skipped': True, 'reason': 'not scheduled for this hour'})
+            try:
+                synced = run_full_sync_auto()
+                return ok({'ok': True, 'synced': synced})
+            except Exception as e:
+                return err(f'Ошибка автосинхронизации: {e}', 500)
 
         if action == 'stock_check':
             cart_items = body.get('items') or []
