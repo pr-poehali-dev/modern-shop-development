@@ -185,7 +185,7 @@ def sync_page(page):
     return synced, total_pages
 
 
-def finish_sync(total_synced):
+def finish_sync(total_synced, log_id=None):
     """Обновляет статус после завершения синхронизации."""
     conn = get_db()
     cur = conn.cursor()
@@ -193,6 +193,39 @@ def finish_sync(total_synced):
         """UPDATE catalog_sync_schedule SET last_sync_at=NOW(), last_sync_status='ok', last_sync_count=%s, last_sync_error=NULL, updated_at=NOW()
            WHERE id=(SELECT id FROM catalog_sync_schedule ORDER BY id LIMIT 1)""",
         (total_synced,)
+    )
+    if log_id:
+        cur.execute(
+            "UPDATE catalog_sync_log SET finished_at=NOW(), status='ok', synced_count=%s WHERE id=%s",
+            (total_synced, log_id)
+        )
+    conn.commit()
+    conn.close()
+
+
+def log_sync_start(trigger_type='manual'):
+    """Создаёт запись лога и возвращает log_id."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO catalog_sync_log (trigger_type, status) VALUES (%s, 'running') RETURNING id",
+        (trigger_type,)
+    )
+    log_id = cur.fetchone()[0]
+    conn.commit()
+    conn.close()
+    return log_id
+
+
+def log_sync_error(log_id, error_text):
+    """Закрывает запись лога с ошибкой."""
+    if not log_id:
+        return
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE catalog_sync_log SET finished_at=NOW(), status='error', error_text=%s WHERE id=%s",
+        (str(error_text)[:2000], log_id)
     )
     conn.commit()
     conn.close()
@@ -253,22 +286,51 @@ def handler(event: dict, context) -> dict:
 
         if action == 'sync_finish':
             total_synced = int(body.get('total_synced', 0))
+            log_id = body.get('log_id')
             try:
-                finish_sync(total_synced)
+                finish_sync(total_synced, log_id)
                 return ok({'ok': True})
             except Exception as e:
                 return err(f'Ошибка завершения: {e}', 500)
 
+        if action == 'sync_start':
+            trigger_type = body.get('trigger_type', 'manual')
+            try:
+                log_id = log_sync_start(trigger_type)
+                return ok({'ok': True, 'log_id': log_id})
+            except Exception as e:
+                return err(f'Ошибка старта: {e}', 500)
+
+        if action == 'sync_error':
+            log_id = body.get('log_id')
+            error_text = body.get('error', '')
+            try:
+                log_sync_error(log_id, error_text)
+                conn = get_db()
+                cur = conn.cursor()
+                cur.execute(
+                    "UPDATE catalog_sync_schedule SET last_sync_at=NOW(), last_sync_status='error', last_sync_error=%s, updated_at=NOW() WHERE id=(SELECT id FROM catalog_sync_schedule ORDER BY id LIMIT 1)",
+                    (str(error_text)[:2000],)
+                )
+                conn.commit()
+                conn.close()
+                return ok({'ok': True})
+            except Exception as e:
+                return err(f'Ошибка: {e}', 500)
+
         if action == 'sync':
             # Оставляем для совместимости — синхронизирует только первую страницу
+            trigger_type = body.get('trigger_type', 'auto')
+            log_id = log_sync_start(trigger_type)
             try:
                 sync_categories()
                 synced, total_pages = sync_page(1)
                 if total_pages == 1:
-                    finish_sync(synced)
+                    finish_sync(synced, log_id)
                     return ok({'ok': True, 'synced': synced, 'total_pages': 1})
-                return ok({'ok': True, 'synced': synced, 'total_pages': total_pages, 'page': 1})
+                return ok({'ok': True, 'synced': synced, 'total_pages': total_pages, 'page': 1, 'log_id': log_id})
             except Exception as e:
+                log_sync_error(log_id, str(e))
                 try:
                     conn = get_db()
                     cur = conn.cursor()
@@ -307,6 +369,29 @@ def handler(event: dict, context) -> dict:
         return err('Неизвестный action', 404)
 
     # GET
+    if action == 'sync_log':
+        user_id = verify_admin_token(headers)
+        if not user_id:
+            return err('Не авторизован', 401)
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, started_at, finished_at, trigger_type, status, synced_count, error_text FROM catalog_sync_log ORDER BY id DESC LIMIT 50"
+        )
+        rows = cur.fetchall()
+        conn.close()
+        return ok({'items': [
+            {
+                'id': r[0],
+                'started_at': r[1],
+                'finished_at': r[2],
+                'trigger_type': r[3],
+                'status': r[4],
+                'synced_count': r[5],
+                'error_text': r[6],
+            } for r in rows
+        ]})
+
     if action == 'sync_status':
         user_id = verify_admin_token(headers)
         if not user_id:

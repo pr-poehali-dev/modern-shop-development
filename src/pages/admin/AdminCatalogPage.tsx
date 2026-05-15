@@ -21,6 +21,16 @@ interface SyncStatus {
   product_count: number;
 }
 
+interface SyncLogItem {
+  id: number;
+  started_at: string;
+  finished_at: string | null;
+  trigger_type: "manual" | "auto";
+  status: "ok" | "error" | "running";
+  synced_count: number | null;
+  error_text: string | null;
+}
+
 interface FeaturedProduct {
   id: number;
   section: string;
@@ -133,7 +143,18 @@ function SyncTab({ token }: { token: string }) {
   const [times, setTimes] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncLog, setSyncLog] = useState<SyncLogItem[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const loadLog = useCallback(async () => {
+    try {
+      const res = await fetch(`${CATALOG_API_URL}?action=sync_log`, {
+        headers: { "X-Admin-Token": token },
+      });
+      const data = await res.json();
+      setSyncLog(data.items || []);
+    } catch { /* ignore */ }
+  }, [token]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -149,6 +170,8 @@ function SyncTab({ token }: { token: string }) {
       setLoading(false);
     }
   }, [token]);
+
+  useEffect(() => { loadLog(); }, [loadLog]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -174,7 +197,6 @@ function SyncTab({ token }: { token: string }) {
   };
 
   const handleSync = async () => {
-    // Запускаем таймер
     let elapsed = 0;
     timerRef.current = setInterval(() => {
       elapsed += 1;
@@ -183,7 +205,12 @@ function SyncTab({ token }: { token: string }) {
 
     setProgress({ stage: "categories", page: 0, totalPages: 0, synced: 0, elapsed: 0 });
 
+    let logId: number | null = null;
     try {
+      // Создаём запись в журнале
+      const startData = await post("sync_start", { trigger_type: "manual" });
+      logId = startData.log_id ?? null;
+
       // 1. Категории
       await post("sync_categories", {});
 
@@ -204,17 +231,22 @@ function SyncTab({ token }: { token: string }) {
 
       // 3. Финализация
       setProgress(p => ({ ...p, stage: "finish" }));
-      await post("sync_finish", { total_synced: totalSynced });
+      await post("sync_finish", { total_synced: totalSynced, log_id: logId });
 
       if (timerRef.current) clearInterval(timerRef.current);
       setProgress(p => ({ ...p, stage: "done", synced: totalSynced }));
       toast.success(`Готово! Синхронизировано ${totalSynced} товаров`);
       load();
+      loadLog();
     } catch (e: unknown) {
       if (timerRef.current) clearInterval(timerRef.current);
       const msg = e instanceof Error ? e.message : "Ошибка соединения";
       setProgress(p => ({ ...p, stage: "error", error: msg }));
       toast.error(msg);
+      if (logId) {
+        post("sync_error", { log_id: logId, error: msg }).catch(() => {});
+      }
+      loadLog();
     }
   };
 
@@ -354,6 +386,68 @@ function SyncTab({ token }: { token: string }) {
         >
           {saving ? "Сохраняем..." : "Сохранить расписание"}
         </button>
+      </div>
+
+      {/* Журнал синхронизации */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+            <Icon name="ScrollText" size={18} className="text-[#e31e24]" /> Журнал обновлений
+          </h3>
+          <button onClick={loadLog} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <Icon name="RefreshCw" size={14} />
+          </button>
+        </div>
+        {syncLog.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-6">Записей пока нет</p>
+        ) : (
+          <div className="space-y-2">
+            {syncLog.map(item => {
+              const started = new Date(item.started_at);
+              const finished = item.finished_at ? new Date(item.finished_at) : null;
+              const durationSec = finished ? Math.round((finished.getTime() - started.getTime()) / 1000) : null;
+              return (
+                <div key={item.id} className={`flex items-start gap-3 rounded-xl px-3 py-2.5 text-sm ${
+                  item.status === "ok" ? "bg-green-50" :
+                  item.status === "error" ? "bg-red-50" : "bg-blue-50"
+                }`}>
+                  <div className="mt-0.5 flex-shrink-0">
+                    {item.status === "ok" && <Icon name="CheckCircle" size={15} className="text-green-500" />}
+                    {item.status === "error" && <Icon name="XCircle" size={15} className="text-red-500" />}
+                    {item.status === "running" && <div className="w-3.5 h-3.5 rounded-full border-2 border-blue-300 border-t-blue-600 animate-spin" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`font-medium ${
+                        item.status === "ok" ? "text-green-800" :
+                        item.status === "error" ? "text-red-800" : "text-blue-800"
+                      }`}>
+                        {item.status === "ok" ? `${item.synced_count?.toLocaleString("ru") ?? 0} товаров` :
+                         item.status === "error" ? "Ошибка" : "Выполняется..."}
+                      </span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                        item.trigger_type === "manual"
+                          ? "bg-gray-100 text-gray-600"
+                          : "bg-blue-100 text-blue-700"
+                      }`}>
+                        {item.trigger_type === "manual" ? "Вручную" : "Авто"}
+                      </span>
+                      {durationSec !== null && (
+                        <span className="text-xs text-gray-400">{durationSec < 60 ? `${durationSec}с` : `${Math.floor(durationSec/60)}м ${durationSec%60}с`}</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {started.toLocaleString("ru", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                    {item.error_text && (
+                      <p className="text-xs text-red-600 mt-1 truncate">{item.error_text}</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
