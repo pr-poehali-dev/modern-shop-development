@@ -340,6 +340,57 @@ def handler(event: dict, context) -> dict:
         conn.close()
         return ok({'items': [{'id': r[0], 'name': r[1], 'parent_id': r[2], 'count': counts.get(r[0], 0)} for r in rows]})
 
+    if action == 'catalog':
+        # Товары + категории за один запрос
+        page = int(params.get('page', 1))
+        per_page = int(params.get('per_page', PER_PAGE))
+        category_id = params.get('category_id')
+        search = params.get('search', '').strip()
+        in_stock_only = params.get('in_stock_only') == '1'
+
+        conditions = ['p.is_active=TRUE']
+        args = []
+        if category_id:
+            conditions.append('p.category_id=%s')
+            args.append(int(category_id))
+        if search:
+            conditions.append('(p.name ILIKE %s OR p.sku ILIKE %s)')
+            args.extend([f'%{search}%', f'%{search}%'])
+        if in_stock_only:
+            conditions.append('EXISTS (SELECT 1 FROM catalog_stock cs WHERE cs.product_id=p.id AND cs.quantity>0)')
+
+        where = ' AND '.join(conditions)
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute("SELECT id, name, parent_id FROM catalog_categories ORDER BY name")
+        cat_rows = cur.fetchall()
+        cur.execute("SELECT category_id, COUNT(*) FROM catalog_products WHERE is_active=TRUE GROUP BY category_id")
+        counts = {r[0]: r[1] for r in cur.fetchall()}
+        categories = [{'id': r[0], 'name': r[1], 'parent_id': r[2], 'count': counts.get(r[0], 0)} for r in cat_rows]
+
+        cur.execute(f"SELECT COUNT(*) FROM catalog_products p WHERE {where}", args)
+        total = cur.fetchone()[0]
+        pages = max(1, (total + per_page - 1) // per_page)
+        offset = (page - 1) * per_page
+        cur.execute(
+            f"""SELECT p.id, p.name, p.sku, p.price, p.old_price, p.image_url, p.description, p.category_id, p.category_name, p.unit
+                FROM catalog_products p WHERE {where}
+                ORDER BY p.name LIMIT %s OFFSET %s""",
+            args + [per_page, offset]
+        )
+        rows = cur.fetchall()
+        pids = [r[0] for r in rows]
+        stock_map = load_stock_for_products(cur, pids)
+        conn.close()
+        return ok({
+            'categories': categories,
+            'items': [product_row_to_dict(r, stock_map) for r in rows],
+            'total': total,
+            'pages': pages,
+            'page': page,
+        })
+
     if action == 'product':
         pid = params.get('id')
         if not pid:

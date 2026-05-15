@@ -8,8 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { useLocationStores } from "@/hooks/useVisibleStores";
 
-const API_URL = "https://functions.poehali.dev/c7265605-961b-48cb-9594-4caad2cb333e";
-const ADMIN_API_URL = "https://functions.poehali.dev/58efb070-a53e-4380-88c5-6f0f16480430";
+const API_URL = "https://functions.poehali.dev/15c8aecd-d37b-4aed-abce-dc0748135610";
 const USER_API_URL = "https://functions.poehali.dev/ef02c3ce-d482-422a-9426-60d8f91b4b86";
 const PER_PAGE = 24;
 
@@ -21,11 +20,6 @@ interface StockEntry {
   quantity: number;
 }
 
-interface Store {
-  id: number;
-  name: string;
-  main: boolean;
-}
 
 interface Product {
   id: string | number;
@@ -314,24 +308,17 @@ export default function CatalogPage() {
   const visibleStoreIds = useLocationStores();
 
   const [products, setProducts] = useState<Product[]>([]);
-  const [allInStockProducts, setAllInStockProducts] = useState<Product[] | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [stores, setStores] = useState<Store[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [inStockLoading, setInStockLoading] = useState(false);
   const [catLoading, setCatLoading] = useState(true);
   const [error, setError] = useState("");
 
   const page = parseInt(searchParams.get("page") || "1");
   const categoryId = searchParams.get("category") || "";
   const search = searchParams.get("search") || "";
-  const storeId = searchParams.get("store") || "";
   const inStockOnly = searchParams.get("in_stock") === "1";
   const [searchInput, setSearchInput] = useState(search);
-
-  // Страница внутри отфильтрованного списка "в наличии"
-  const [inStockPage, setInStockPage] = useState(1);
 
   const isInStockForLocation = useCallback((product: Product) => {
     const filtered = visibleStoreIds && visibleStoreIds.length > 0
@@ -358,44 +345,28 @@ export default function CatalogPage() {
     try { sessionStorage.setItem(key, JSON.stringify({ data, ts: Date.now() })); } catch (e) { void e; }
   };
 
-  const loadCategories = useCallback(async () => {
-    const cacheKey = "sc_catalog_categories_v2";
-    const cached = getCatalogCache(cacheKey);
-    if (cached) { setCategories(cached); setCatLoading(false); return; }
-    setCatLoading(true);
-    try {
-      const res = await fetch(`${ADMIN_API_URL}?action=categories`);
-      const data = await res.json();
-      const items = data.items || [];
-      setCategories(items);
-      setCatalogCache(cacheKey, items);
-    } catch {
-      setCategories([]);
-    } finally {
-      setCatLoading(false);
-    }
-  }, []);
-
-  const loadProducts = useCallback(async () => {
+  const loadCatalog = useCallback(async () => {
     setError("");
-    let url = `${API_URL}?action=products&page=${page}&per_page=${PER_PAGE}`;
+    const inStock = inStockOnly ? "&in_stock_only=1" : "";
+    let url = `${API_URL}?action=catalog&page=${page}&per_page=${PER_PAGE}${inStock}`;
     if (categoryId) url += `&category_id=${categoryId}`;
     if (search) url += `&search=${encodeURIComponent(search)}`;
-    if (storeId) url += `&store_id=${storeId}`;
 
-    const cacheKey = `sc_catalog_${url}`;
+    const cacheKey = `sc_catalog2_${url}`;
     const cached = getCatalogCache(cacheKey);
     if (cached) {
       const items: Product[] = cached.items || [];
       items.sort((a, b) => (isInStockForLocation(b) ? 1 : 0) - (isInStockForLocation(a) ? 1 : 0));
       setProducts(items);
       setTotal(cached.total || 0);
-      if (cached.stores?.length) setStores(cached.stores);
+      setCategories(cached.categories || []);
+      setCatLoading(false);
       setLoading(false);
       return;
     }
 
     setLoading(true);
+    setCatLoading(true);
     try {
       const res = await fetch(url);
       const data = await res.json();
@@ -412,7 +383,7 @@ export default function CatalogPage() {
         });
         setProducts(items);
         setTotal(data.total || 0);
-        if (data.stores?.length) setStores(data.stores);
+        setCategories(data.categories || []);
         setCatalogCache(cacheKey, data);
       }
     } catch (e: unknown) {
@@ -420,71 +391,13 @@ export default function CatalogPage() {
       setProducts([]);
     } finally {
       setLoading(false);
+      setCatLoading(false);
     }
-  }, [page, categoryId, search, storeId, isInStockForLocation]);
-
-  // Загружает ВСЕ товары постранично и фильтрует только "в наличии"
-  const loadAllInStock = useCallback(async () => {
-    setInStockLoading(true);
-    setError("");
-    try {
-      const firstUrl = `${API_URL}?action=products&page=1&per_page=100` +
-        (categoryId ? `&category_id=${categoryId}` : "") +
-        (search ? `&search=${encodeURIComponent(search)}` : "") +
-        (storeId ? `&store_id=${storeId}` : "");
-      const firstRes = await fetch(firstUrl);
-      const firstData = await firstRes.json();
-      if (firstData.error) { setError(firstData.error); setInStockLoading(false); return; }
-
-      const serverTotal: number = firstData.total || 0;
-      const totalApiPages = Math.ceil(serverTotal / 100);
-      let all: Product[] = [...(firstData.items || [])];
-
-      // Грузим остальные страницы параллельно
-      if (totalApiPages > 1) {
-        const rest = await Promise.all(
-          Array.from({ length: totalApiPages - 1 }, (_, i) => {
-            const u = `${API_URL}?action=products&page=${i + 2}&per_page=100` +
-              (categoryId ? `&category_id=${categoryId}` : "") +
-              (search ? `&search=${encodeURIComponent(search)}` : "") +
-              (storeId ? `&store_id=${storeId}` : "");
-            return fetch(u).then(r => r.json());
-          })
-        );
-        rest.forEach(d => { if (d.items) all = all.concat(d.items); });
-      }
-
-      const filtered = all.filter(p => isInStockForLocation(p));
-      setAllInStockProducts(filtered);
-      if (firstData.stores?.length) setStores(firstData.stores);
-    } catch (e: unknown) {
-      setError(String(e));
-      setAllInStockProducts([]);
-    } finally {
-      setInStockLoading(false);
-    }
-  }, [categoryId, search, storeId, isInStockForLocation]);
-
-  useEffect(() => { loadCategories(); }, [loadCategories]);
+  }, [page, categoryId, search, inStockOnly, isInStockForLocation]);
 
   useEffect(() => {
-    if (inStockOnly) {
-      setAllInStockProducts(null);
-      setInStockPage(1);
-      loadAllInStock();
-    } else {
-      loadProducts();
-    }
-  }, [inStockOnly, loadProducts, loadAllInStock]);
-
-  // При смене локации — перезагружаем
-  useEffect(() => {
-    if (inStockOnly) {
-      setAllInStockProducts(null);
-      setInStockPage(1);
-      loadAllInStock();
-    }
-  }, [visibleStoreIds]); // eslint-disable-line react-hooks/exhaustive-deps
+    loadCatalog();
+  }, [loadCatalog]);
 
   const setFilter = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams);
@@ -517,21 +430,11 @@ export default function CatalogPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const goInStockPage = (p: number) => {
-    setInStockPage(p);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
   // Данные для отображения
-  const isLoading = inStockOnly ? inStockLoading : loading;
-  const displayProducts = inStockOnly && allInStockProducts !== null
-    ? allInStockProducts.slice((inStockPage - 1) * PER_PAGE, inStockPage * PER_PAGE)
-    : products;
-  const displayTotal = inStockOnly && allInStockProducts !== null ? allInStockProducts.length : total;
-  const displayTotalPages = inStockOnly && allInStockProducts !== null
-    ? Math.ceil(allInStockProducts.length / PER_PAGE)
-    : totalPages;
-  const displayPage = inStockOnly ? inStockPage : page;
+  const displayProducts = products;
+  const displayTotal = total;
+  const displayTotalPages = totalPages;
+  const displayPage = page;
 
   const selectedCategory = categories.find((c) => String(c.id) === categoryId);
 
@@ -565,7 +468,7 @@ export default function CatalogPage() {
           <div className="flex items-center gap-4 flex-1 min-w-0">
             <h1 className="text-2xl font-bold text-gray-900 whitespace-nowrap">
               {selectedCategory ? selectedCategory.name : "Каталог товаров"}
-              {displayTotal > 0 && !isLoading && (
+              {displayTotal > 0 && !loading && (
                 <span className="ml-2 text-base text-gray-400 font-normal">
                   {displayTotal.toLocaleString("ru")}
                 </span>
@@ -585,10 +488,9 @@ export default function CatalogPage() {
             <span className={`text-sm font-medium transition-colors ${inStockOnly ? "text-green-700" : "text-gray-600 group-hover:text-green-600"}`}>
               В наличии
             </span>
-            {inStockOnly && allInStockProducts !== null && (
-              <span className="text-xs text-green-600 font-medium">{allInStockProducts.length}</span>
+            {inStockOnly && displayTotal > 0 && (
+              <span className="text-xs text-green-600 font-medium">{displayTotal}</span>
             )}
-            {inStockLoading && <span className="w-3.5 h-3.5 rounded-full border-2 border-green-200 border-t-green-600 animate-spin inline-block" />}
             </label>
           </div>
           <form onSubmit={handleSearch} className="flex gap-2 w-full sm:w-80">
@@ -637,7 +539,7 @@ export default function CatalogPage() {
         )}
 
         {/* Grid */}
-        {isLoading ? (
+        {loading ? (
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
             {Array.from({ length: PER_PAGE }).map((_, i) => (
               <SkeletonCard key={i} />
@@ -660,10 +562,10 @@ export default function CatalogPage() {
         ) : null}
 
         {/* Pagination */}
-        {!isLoading && displayTotalPages > 1 && (
+        {!loading && displayTotalPages > 1 && (
           <div className="flex items-center justify-center gap-1.5 mt-8">
             <button
-              onClick={() => inStockOnly ? goInStockPage(displayPage - 1) : goPage(displayPage - 1)}
+              onClick={() => goPage(displayPage - 1)}
               disabled={displayPage <= 1}
               className="w-9 h-9 rounded-xl border border-[#e8e8e8] bg-white flex items-center justify-center text-gray-500 hover:border-[#e31e24] hover:text-[#e31e24] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
@@ -684,7 +586,7 @@ export default function CatalogPage() {
               return (
                 <button
                   key={p}
-                  onClick={() => inStockOnly ? goInStockPage(p) : goPage(p)}
+                  onClick={() => goPage(p)}
                   className={`w-9 h-9 rounded-xl border text-sm font-medium transition-colors ${
                     p === displayPage
                       ? "bg-[#e31e24] text-white border-[#e31e24]"
@@ -697,7 +599,7 @@ export default function CatalogPage() {
             })}
 
             <button
-              onClick={() => inStockOnly ? goInStockPage(displayPage + 1) : goPage(displayPage + 1)}
+              onClick={() => goPage(displayPage + 1)}
               disabled={displayPage >= displayTotalPages}
               className="w-9 h-9 rounded-xl border border-[#e8e8e8] bg-white flex items-center justify-center text-gray-500 hover:border-[#e31e24] hover:text-[#e31e24] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
