@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 
-const API_URL = "https://functions.poehali.dev/58efb070-a53e-4380-88c5-6f0f16480430";
+const CATALOG_API_URL = "https://functions.poehali.dev/15c8aecd-d37b-4aed-abce-dc0748135610";
 
 interface Category {
   id: string | number;
@@ -11,15 +11,16 @@ interface Category {
   count: number;
 }
 
-const navLinks = [
-  "Акции",
-  "Рассрочка 0%",
-  "Трейд-ин",
-  "Кредит",
-  "Подписки",
-  "Новинки",
-  "Лизинг",
+const navLinks: { label: string; color?: string }[] = [
+  { label: "Акции", color: "#ff4c06" },
+  { label: "Новинки", color: "#4db8ff" },
+  { label: "Доставка" },
+  { label: "Оплата" },
+  { label: "О компании" },
+  { label: "Контакты" },
 ];
+
+const F = "'Nunito Sans', Tahoma, sans-serif";
 
 export default function ServiceclickNav() {
   const [open, setOpen] = useState(false);
@@ -34,7 +35,7 @@ export default function ServiceclickNav() {
   useEffect(() => {
     if (open && categories.length === 0 && !loading) {
       setLoading(true);
-      fetch(`${API_URL}?action=categories`)
+      fetch(`${CATALOG_API_URL}?action=categories`)
         .then((r) => r.json())
         .then((d) => setCategories(d.items || []))
         .catch(() => {})
@@ -51,9 +52,7 @@ export default function ServiceclickNav() {
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -77,215 +76,230 @@ export default function ServiceclickNav() {
   };
 
   const q = search.trim().toLowerCase();
-
-  // При поиске — показываем все совпадающие (включая дочерние) без иерархии
   const isSearching = q.length > 0;
 
   const filteredAll = isSearching
-    ? categories
-        .filter((c) => c.name.toLowerCase().includes(q))
-        .sort((a, b) => a.name.localeCompare(b.name, "ru"))
+    ? categories.filter((c) => c.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name, "ru"))
     : [];
 
-  // Корневые категории, отсортированные по алфавиту
   const rootCats = categories
     .filter((c) => !c.parent_id)
     .sort((a, b) => a.name.localeCompare(b.name, "ru"));
 
   return (
     <>
-      <nav className="bg-[#2a2a2a] border-b border-[#1a1a1a] relative z-50">
-        <div className="max-w-[1200px] mx-auto px-4 flex items-center h-11">
+      {/* ── NAV BAR ── */}
+      <nav style={{ background: "#2a2a2a", borderBottom: "1px solid #1e1e1e", position: "relative", zIndex: 50, fontFamily: F }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 15px", display: "flex", alignItems: "stretch", height: 44 }}>
+
+          {/* Кнопка Каталог */}
           <button
             onClick={() => setOpen((v) => !v)}
-            className={`flex items-center gap-2 font-semibold text-sm h-11 px-4 mr-2 transition-colors flex-shrink-0 ${
-              open
-                ? "bg-[#e31e24] text-white"
-                : "bg-[#e31e24] text-white hover:bg-[#c41920]"
-            }`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "0 18px",
+              background: open
+                ? "linear-gradient(0deg, #c43700 0%, #ff4c06 100%)"
+                : "linear-gradient(0deg, #c43700 0%, #ff4c06 100%)",
+              border: "none",
+              color: "#fff",
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: "pointer",
+              flexShrink: 0,
+              fontFamily: F,
+              letterSpacing: "0.2px",
+            }}
+            onMouseOver={e => (e.currentTarget.style.background = "linear-gradient(0deg, #d64a13 0%, #ff4c06 100%)")}
+            onMouseOut={e => (e.currentTarget.style.background = "linear-gradient(0deg, #c43700 0%, #ff4c06 100%)")}
           >
             <Icon name={open ? "X" : "LayoutGrid"} size={15} />
             Каталог товаров
             <Icon name={open ? "ChevronUp" : "ChevronDown"} size={13} />
           </button>
 
-          <div className="h-full w-px bg-[#3a3a3a] mx-1 flex-shrink-0" />
+          {/* Разделитель */}
+          <div style={{ width: 1, background: "#3a3a3a", margin: "8px 6px", flexShrink: 0 }} />
 
-          <div className="flex items-center gap-0 overflow-x-auto scrollbar-none">
-            {navLinks.map((link) => (
+          {/* Ссылки */}
+          <div style={{ display: "flex", alignItems: "center", overflow: "hidden" }}>
+            {navLinks.map(({ label, color }) => (
               <a
-                key={link}
+                key={label}
                 href="#"
-                className={`text-sm h-11 px-3.5 flex items-center transition-colors whitespace-nowrap hover:text-white ${
-                  link === "Акции"
-                    ? "text-[#ff6b35] font-semibold"
-                    : link === "Рассрочка 0%"
-                    ? "text-[#4db8ff] font-semibold"
-                    : "text-[#aaa]"
-                }`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  height: "100%",
+                  padding: "0 14px",
+                  color: color ?? "#aaa",
+                  textDecoration: "none",
+                  fontSize: 14,
+                  fontWeight: color ? 700 : 400,
+                  whiteSpace: "nowrap",
+                  transition: "color .15s",
+                  fontFamily: F,
+                }}
+                onMouseOver={e => (e.currentTarget.style.color = "#fff")}
+                onMouseOut={e => (e.currentTarget.style.color = color ?? "#aaa")}
               >
-                {link}
+                {label}
               </a>
             ))}
           </div>
         </div>
       </nav>
 
+      {/* Overlay */}
       {open && (
         <div
-          className="fixed inset-0 z-40 bg-black/20"
+          style={{ position: "fixed", inset: 0, zIndex: 40, background: "rgba(0,0,0,0.45)" }}
           onClick={() => setOpen(false)}
         />
       )}
 
+      {/* ── SLIDE PANEL ── */}
       <div
         ref={panelRef}
-        className={`fixed top-0 left-0 h-full z-50 bg-[#2d2d2d] shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${
-          open ? "translate-x-0" : "-translate-x-full"
-        }`}
-        style={{ width: 300 }}
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          height: "100%",
+          width: 300,
+          zIndex: 200,
+          background: "#2d2d2d",
+          boxShadow: "4px 0 24px rgba(0,0,0,.7)",
+          display: "flex",
+          flexDirection: "column",
+          transform: open ? "translateX(0)" : "translateX(-100%)",
+          transition: "transform .28s ease-in-out",
+          fontFamily: F,
+        }}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 h-12 bg-[#e31e24] flex-shrink-0">
-          <span className="text-white font-bold text-sm flex items-center gap-2">
-            <Icon name="LayoutGrid" size={16} />
-            Каталог товаров
+        {/* Panel header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px", height: 48, background: "linear-gradient(0deg, #c43700 0%, #ff4c06 100%)", flexShrink: 0 }}>
+          <span style={{ color: "#fff", fontWeight: 700, fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
+            <Icon name="LayoutGrid" size={16} /> Каталог товаров
           </span>
-          <button
-            onClick={() => setOpen(false)}
-            className="text-white/80 hover:text-white transition-colors"
+          <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,.8)", cursor: "pointer", padding: 4 }}
+            onMouseOver={e => (e.currentTarget.style.color = "#fff")}
+            onMouseOut={e => (e.currentTarget.style.color = "rgba(255,255,255,.8)")}
           >
             <Icon name="X" size={18} />
           </button>
         </div>
 
         {/* Search */}
-        <div className="px-3 py-2 border-b border-[#444] flex-shrink-0">
-          <div className="relative">
-            <Icon
-              name="Search"
-              size={14}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-            />
+        <div style={{ padding: "8px 10px", borderBottom: "1px solid #3a3a3a", flexShrink: 0 }}>
+          <div style={{ position: "relative" }}>
+            <Icon name="Search" size={14} style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "#666", pointerEvents: "none" }} />
             <input
               ref={searchRef}
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Поиск категории..."
-              className="w-full bg-[#3a3a3a] text-gray-200 text-sm placeholder-gray-500 rounded pl-8 pr-8 py-1.5 outline-none focus:ring-1 focus:ring-[#e31e24]"
+              style={{ width: "100%", boxSizing: "border-box", background: "#3a3a3a", color: "#ddd", fontSize: 13, padding: "7px 28px 7px 30px", border: "1px solid #444", borderRadius: 4, outline: "none", fontFamily: F }}
             />
             {search && (
-              <button
-                onClick={() => setSearch("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200"
-              >
+              <button onClick={() => setSearch("")} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#666", cursor: "pointer", padding: 0 }}>
                 <Icon name="X" size={13} />
               </button>
             )}
           </div>
         </div>
 
-        {/* All catalog */}
+        {/* Все товары */}
         {!isSearching && (
           <button
             onClick={() => { setOpen(false); navigate("/catalog"); }}
-            className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-[#e31e24] hover:bg-[#3a3a3a] border-b border-[#444] transition-colors text-left flex-shrink-0"
+            style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 16px", background: "none", border: "none", borderBottom: "1px solid #3a3a3a", color: "#ff4c06", fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "left", flexShrink: 0, fontFamily: F }}
+            onMouseOver={e => (e.currentTarget.style.background = "#333")}
+            onMouseOut={e => (e.currentTarget.style.background = "none")}
           >
-            <Icon name="List" size={15} />
-            Все товары
+            <Icon name="List" size={15} /> Все товары
           </button>
         )}
 
-        {/* Categories */}
-        <div className="flex-1 overflow-y-auto">
+        {/* Categories list */}
+        <div style={{ flex: 1, overflowY: "auto" }}>
           {loading && (
-            <div className="flex flex-col gap-1 p-3">
+            <div style={{ padding: 10, display: "flex", flexDirection: "column", gap: 6 }}>
               {Array.from({ length: 10 }).map((_, i) => (
-                <div key={i} className="h-8 bg-[#3a3a3a] rounded animate-pulse" />
+                <div key={i} style={{ height: 32, background: "#3a3a3a", borderRadius: 4, animation: "pulse 1.5s infinite" }} />
               ))}
             </div>
           )}
 
           {!loading && categories.length === 0 && (
-            <p className="text-xs text-gray-400 px-4 py-4">Категории не найдены</p>
+            <p style={{ color: "#666", fontSize: 13, padding: "16px" }}>Категории не найдены</p>
           )}
 
-          {/* Search results — flat list */}
+          {/* Search results */}
           {!loading && isSearching && (
             <>
               {filteredAll.length === 0 && (
-                <p className="text-xs text-gray-400 px-4 py-4">Ничего не найдено</p>
+                <p style={{ color: "#666", fontSize: 13, padding: "16px" }}>Ничего не найдено</p>
               )}
               {filteredAll.map((cat) => (
                 <button
                   key={cat.id}
                   onClick={() => handleCategoryClick(cat)}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-200 hover:bg-[#3a3a3a] hover:text-[#e31e24] transition-colors border-b border-[#444] text-left"
+                  style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 16px", background: "none", border: "none", borderBottom: "1px solid #383838", color: "#ccc", fontSize: 13, cursor: "pointer", textAlign: "left", fontFamily: F }}
+                  onMouseOver={e => { e.currentTarget.style.background = "#3a3a3a"; e.currentTarget.style.color = "#ff4c06"; }}
+                  onMouseOut={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "#ccc"; }}
                 >
-                  {cat.parent_id && (
-                    <Icon name="CornerDownRight" size={12} className="text-gray-500 flex-shrink-0" />
-                  )}
-                  <span className="break-words whitespace-normal">{cat.name}</span>
+                  {cat.parent_id && <Icon name="CornerDownRight" size={12} style={{ color: "#555", flexShrink: 0 }} />}
+                  <span>{cat.name}</span>
                 </button>
               ))}
             </>
           )}
 
-          {/* Normal hierarchical list */}
+          {/* Hierarchical list */}
           {!loading && !isSearching && rootCats.map((cat) => {
-            const children = childrenOf(cat.id).sort((a, b) =>
-              a.name.localeCompare(b.name, "ru")
-            );
+            const children = childrenOf(cat.id).sort((a, b) => a.name.localeCompare(b.name, "ru"));
             const hasChildren = children.length > 0;
             const isExpanded = expandedIds.has(cat.id);
 
             return (
               <div key={cat.id}>
-                <div className="flex items-stretch border-b border-[#444]">
-                  <button
-                    onClick={() => {
-                      if (hasChildren) {
-                        toggleExpand(cat.id);
-                      } else {
-                        handleCategoryClick(cat);
-                      }
-                    }}
-                    className="flex-1 flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-[#3a3a3a] hover:text-[#e31e24] transition-colors text-left"
-                  >
-                    <span className="break-words whitespace-normal">{cat.name}</span>
-                    {!hasChildren && cat.count > 0 && (
-                      <span className="text-[10px] text-gray-500 ml-2 flex-shrink-0">{cat.count}</span>
-                    )}
-                    {hasChildren && (
-                      <Icon
-                        name={isExpanded ? "ChevronUp" : "ChevronDown"}
-                        size={13}
-                        className="ml-2 flex-shrink-0 text-gray-400"
-                      />
-                    )}
-                  </button>
-                </div>
+                <button
+                  onClick={() => hasChildren ? toggleExpand(cat.id) : handleCategoryClick(cat)}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "10px 16px", background: "none", border: "none", borderBottom: "1px solid #383838", color: "#ccc", fontSize: 13, cursor: "pointer", textAlign: "left", fontFamily: F }}
+                  onMouseOver={e => { e.currentTarget.style.background = "#3a3a3a"; e.currentTarget.style.color = "#ff4c06"; }}
+                  onMouseOut={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "#ccc"; }}
+                >
+                  <span style={{ wordBreak: "break-word" }}>{cat.name}</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, marginLeft: 8 }}>
+                    {!hasChildren && cat.count > 0 && <span style={{ fontSize: 10, color: "#555" }}>{cat.count}</span>}
+                    {hasChildren && <Icon name={isExpanded ? "ChevronUp" : "ChevronDown"} size={13} style={{ color: "#555" }} />}
+                  </span>
+                </button>
 
                 {hasChildren && isExpanded && (
-                  <div className="bg-[#252525]">
+                  <div style={{ background: "#252525" }}>
                     <button
                       onClick={() => handleCategoryClick(cat)}
-                      className="w-full flex items-center gap-2 pl-8 pr-4 py-2 text-[13px] text-[#e31e24] hover:bg-[#3a3a3a] transition-colors border-b border-[#383838] text-left"
+                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 16px 9px 28px", background: "none", border: "none", borderBottom: "1px solid #333", color: "#ff4c06", fontSize: 12, cursor: "pointer", textAlign: "left", fontFamily: F }}
+                      onMouseOver={e => (e.currentTarget.style.background = "#333")}
+                      onMouseOut={e => (e.currentTarget.style.background = "none")}
                     >
-                      <Icon name="Layers" size={12} className="flex-shrink-0" />
-                      <span>Все в «{cat.name}»</span>
+                      <Icon name="Layers" size={12} /> Все в «{cat.name}»
                     </button>
                     {children.map((child) => (
                       <button
                         key={child.id}
                         onClick={() => handleCategoryClick(child)}
-                        className="w-full flex items-center justify-between pl-8 pr-4 py-2 text-[13px] text-gray-300 hover:bg-[#3a3a3a] hover:text-[#e31e24] transition-colors border-b border-[#383838] text-left"
+                        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 16px 9px 28px", background: "none", border: "none", borderBottom: "1px solid #333", color: "#bbb", fontSize: 12, cursor: "pointer", textAlign: "left", fontFamily: F }}
+                        onMouseOver={e => { e.currentTarget.style.background = "#333"; e.currentTarget.style.color = "#ff4c06"; }}
+                        onMouseOut={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "#bbb"; }}
                       >
-                        <span className="break-words whitespace-normal">{child.name}</span>
-                        {child.count > 0 && (
-                          <span className="text-[10px] text-gray-500 ml-2 flex-shrink-0">{child.count}</span>
-                        )}
+                        <span style={{ wordBreak: "break-word" }}>{child.name}</span>
+                        {child.count > 0 && <span style={{ fontSize: 10, color: "#555", marginLeft: 6, flexShrink: 0 }}>{child.count}</span>}
                       </button>
                     ))}
                   </div>
