@@ -94,32 +94,40 @@ export default function ServiceclickNav() {
 
   return (
     <>
-      <nav className="bg-white border-b border-[#e0e0e0] relative z-50">
-        <div className="max-w-[1200px] mx-auto px-4 flex items-center gap-6 h-11">
+      <nav className="bg-[#2a2a2a] border-b border-[#1a1a1a] relative z-50">
+        <div className="max-w-[1200px] mx-auto px-4 flex items-center h-11">
           <button
             onClick={() => setOpen((v) => !v)}
-            className={`flex items-center gap-2 font-semibold text-sm h-11 px-1 transition-colors ${
-              open ? "text-[#c41920]" : "text-[#e31e24] hover:text-[#c41920]"
+            className={`flex items-center gap-2 font-semibold text-sm h-11 px-4 mr-2 transition-colors flex-shrink-0 ${
+              open
+                ? "bg-[#e31e24] text-white"
+                : "bg-[#e31e24] text-white hover:bg-[#c41920]"
             }`}
           >
-            <Icon name="LayoutGrid" size={16} />
+            <Icon name={open ? "X" : "LayoutGrid"} size={15} />
             Каталог товаров
-            <Icon name={open ? "ChevronUp" : "ChevronDown"} size={14} />
+            <Icon name={open ? "ChevronUp" : "ChevronDown"} size={13} />
           </button>
 
-          {navLinks.map((link) => (
-            <a
-              key={link}
-              href="#"
-              className={`text-sm h-11 flex items-center hover:text-[#e31e24] transition-colors whitespace-nowrap ${
-                link === "Акции" || link === "Рассрочка 0%"
-                  ? "text-[#e31e24] font-semibold"
-                  : "text-gray-700"
-              }`}
-            >
-              {link}
-            </a>
-          ))}
+          <div className="h-full w-px bg-[#3a3a3a] mx-1 flex-shrink-0" />
+
+          <div className="flex items-center gap-0 overflow-x-auto scrollbar-none">
+            {navLinks.map((link) => (
+              <a
+                key={link}
+                href="#"
+                className={`text-sm h-11 px-3.5 flex items-center transition-colors whitespace-nowrap hover:text-white ${
+                  link === "Акции"
+                    ? "text-[#ff6b35] font-semibold"
+                    : link === "Рассрочка 0%"
+                    ? "text-[#4db8ff] font-semibold"
+                    : "text-[#aaa]"
+                }`}
+              >
+                {link}
+              </a>
+            ))}
+          </div>
         </div>
       </nav>
 
